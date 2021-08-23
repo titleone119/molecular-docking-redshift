@@ -6480,10 +6480,10 @@ progress@^2.0.0, progress@^2.0.3:
   resolved "https://registry.yarnpkg.com/progress/-/progress-2.0.3.tgz#7e8cf8d8f5b8f239c1bc68beb4eb78567d572ef8"
   integrity sha512-7PiHtLll5LdnKIMw100I+8xJXR5gW2QwWYkT6iJva0bXitZKa/XMrSbdmg3r2Xnaidz9Qumd0VPaMrZlF9V9sA==
 
-projen@^0.22.12:
-  version "0.22.12"
-  resolved "https://registry.npmjs.org/projen/-/projen-0.22.12.tgz"
-  integrity sha512-UzzLDvFJ2Mnk37i8W1Rh55iSBgtzf0dY//FiFskUeM/ZbJeqqgdOAmXHRHae0Xh2XItIgc1/6dn6apeJYEQtJA==
+projen@^0.22.15:
+  version "0.22.15"
+  resolved "https://registry.yarnpkg.com/projen/-/projen-0.22.15.tgz#5a77df27140ec2c723570fd34b46a27d1a5394da"
+  integrity sha512-dk7vqIOZTBJeoCII35oPGUt4hku5iwXP6wUVq0TtIExw+XsHQqGrDA/s529KDbkC74no66LGKL9kBofo18KpSg==
   dependencies:
     "@iarna/toml" "^2.2.5"
     chalk "^4.1.1"
@@ -8093,6 +8093,10 @@ xmldom@^0.6.0:
   version "0.6.0"
   resolved "https://registry.yarnpkg.com/xmldom/-/xmldom-0.6.0.tgz#43a96ecb8beece991cef382c08397d82d4d0c46f"
   integrity sha512-iAcin401y58LckRZ0TkI4k0VSM1Qg0KGSc3i8rU+xrxe19A/BN1zHyVSJY7uoutVlaTSzYyk/v5AmkewAP7jtg==
+
+"xmldom@github:xmldom/xmldom#0.7.0":
+  version "0.7.0"
+  resolved "https://codeload.github.com/xmldom/xmldom/tar.gz/c568938641cc1f121cef5b4df80fcfda1e489b6e"
 
 xtend@~4.0.1:
   version "4.0.2"

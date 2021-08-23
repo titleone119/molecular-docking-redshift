@@ -36,7 +36,10 @@ const project = new AwsCdkConstructLibrary({
     '@aws-cdk/aws-sam',
   ],
   deps: ['properties-reader'],
-  bundledDeps: ['properties-reader'],
+  bundledDeps: [
+    'properties-reader',
+    'xmldom@github:xmldom/xmldom#0.7.0',
+  ],
   eslint: true,
   keywords: ['cdk', 'redshift', 'stepfunction', 'orchestration'],
   licensed: false,

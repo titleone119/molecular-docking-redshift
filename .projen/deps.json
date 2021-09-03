@@ -74,7 +74,7 @@
     },
     {
       "name": "projen",
-      "version": "^0.22.12",
+      "version": "^0.22.15",
       "type": "build"
     },
     {
@@ -92,6 +92,11 @@
     },
     {
       "name": "properties-reader",
+      "type": "bundled"
+    },
+    {
+      "name": "xmldom",
+      "version": "github:xmldom/xmldom#0.7.0",
       "type": "bundled"
     },
     {

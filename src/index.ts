@@ -13,7 +13,7 @@ import * as logs from '@aws-cdk/aws-logs';
 import * as sam from '@aws-cdk/aws-sam';
 import * as sqs from '@aws-cdk/aws-sqs';
 import * as cdk from '@aws-cdk/core';
-import { EventsRuleToSqs } from '@aws-solutions-constructs/aws-events-rule-sqs';
+import { EventbridgeToSqs } from '@aws-solutions-constructs/aws-eventbridge-sqs';
 import { LambdaToDynamoDB } from '@aws-solutions-constructs/aws-lambda-dynamodb';
 import { SqsToLambda } from '@aws-solutions-constructs/aws-sqs-lambda';
 
@@ -347,7 +347,7 @@ export class SfnRedshiftTasker extends cdk.Construct {
         existingTableObj: this.trackingTable,
       });
 
-      let eventQueue = new EventsRuleToSqs(
+      let eventQueue = new EventbridgeToSqs(
         this,
         'QueryFinished',
         {

@@ -1,6 +1,6 @@
 const { AwsCdkConstructLibrary } = require('projen');
 
-const AWS_CDK_VERSION = '1.114.0';
+const AWS_CDK_VERSION = '1.115.0';
 const PROJECT_NAME = 'cdk-stepfunctions-redshift';
 const PROJECT_DESCRIPTION = 'A JSII construct lib to build AWS Serverless infrastructure to orchestrate Redshift using AWS stepfunctions.';
 const AUTOMATION_TOKEN = 'PROJEN_GITHUB_TOKEN';
@@ -30,7 +30,7 @@ const project = new AwsCdkConstructLibrary({
     '@aws-cdk/aws-stepfunctions-tasks',
     '@aws-cdk/aws-logs',
     '@aws-cdk/aws-events',
-    '@aws-solutions-constructs/aws-events-rule-sqs',
+    '@aws-solutions-constructs/aws-eventbridge-sqs',
     '@aws-solutions-constructs/aws-sqs-lambda',
     '@aws-solutions-constructs/aws-lambda-dynamodb',
     '@aws-cdk/aws-sam',

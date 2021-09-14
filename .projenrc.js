@@ -1,6 +1,6 @@
 const { AwsCdkConstructLibrary } = require('projen');
 
-const AWS_CDK_VERSION = '1.117.0';
+const AWS_CDK_VERSION = '1.118.0';
 const PROJECT_NAME = 'cdk-stepfunctions-redshift';
 const PROJECT_DESCRIPTION = 'A JSII construct lib to build AWS Serverless infrastructure to orchestrate Redshift using AWS stepfunctions.';
 const AUTOMATION_TOKEN = 'PROJEN_GITHUB_TOKEN';

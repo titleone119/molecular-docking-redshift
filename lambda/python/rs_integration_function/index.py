@@ -2,25 +2,27 @@
 # SPDX-License-Identifier: MIT-0
 
 
-import json
 import traceback
-
 from aws_lambda_powertools.utilities.batch import sqs_batch_processor
+
+from callback_sources.builder import CallbackSourceBuilder
+from callback_sources.helper import CallbackSource, NoCallback
 from ddb.ddb_state_table import DDBStateTable
 from exceptions import ConcurrentExecution, InvalidRequest
 from integration import sanitize_response
-from logger import logger, l_sanitized_response, l_response, l_record, l_message, l_traceback, l_exception
+from logger import logger, l_sanitized_response, l_response, l_record, l_message, l_traceback, l_exception, \
+    l_callback_object
 from environment_labels import env_variable_labels
 from event_labels import (
-    TASK_TOKEN, EXECUTION_ARN, SQL_STATEMENT, STATEMENT_ID, ACTION, DESCRIBE_STATEMENT, GET_STATEMENT_RESULT,
+    EXECUTION_ARN, SQL_STATEMENT, STATEMENT_ID, ACTION, DESCRIBE_STATEMENT, GET_STATEMENT_RESULT,
     NEXT_TOKEN, CANCEL_STATEMENT, EXECUTE_SINGLETON_STATEMENT, EXECUTE_STATEMENT
 )
 from assertion import assert_env_set
 from redshift_data.api import describe_statement, \
     get_statement_result, cancel_statement, get_statement_id_for_statement_name, execute_statement, \
     is_statement_in_active_state
+from redshift_data.finished_event import FinishedEvent
 from statement_class import StatementName
-from step_function.api import StepFunctionAPI
 
 for env_variable_label in env_variable_labels:
     assert_env_set(env_variable_label)
@@ -77,26 +79,27 @@ def _handler(event: dict, context):
 def handle_redshift_statement_invocation_event(event):
     assert SQL_STATEMENT in event, f"Programming error should never handle invocation without SQL_STATEMENT {event}."
     logger.info(event)
-    task_token = event.get(TASK_TOKEN)
-    execution_arn = event.get(EXECUTION_ARN)
     sql_statement = event[SQL_STATEMENT]
     action = event.get(ACTION)
     if action == EXECUTE_SINGLETON_STATEMENT or action == EXECUTE_STATEMENT or action is None:
         run_as_singleton = action == EXECUTE_SINGLETON_STATEMENT
-        return handle_redshift_statement_invocation(sql_statement, task_token, execution_arn, run_as_singleton)
+        callback_object = CallbackSourceBuilder.get_callback_object_for_event(event)
+        return handle_redshift_statement_invocation(sql_statement, callback_object, run_as_singleton)
     else:
         raise InvalidRequest(f"Unsupported {ACTION} to execute sql_statement {event}")
 
 
-def handle_redshift_statement_invocation(sql_statement: str, task_token: str = None, execution_arn: str = None,
-                                         run_as_singleton=False):
+def handle_redshift_statement_invocation(sql_statement: str, callback_object: CallbackSource, run_as_singleton=False):
     if run_as_singleton and is_statement_in_active_state(sql_statement):
         raise ConcurrentExecution(f"There is already an instance of {sql_statement} running.")
-    statement_name = ddb_sfn_state_table.register_execution_start(task_token, execution_arn, sql_statement)
-    response = execute_statement(sql_statement, str(statement_name), with_event=task_token is not None)
+    statement_name = ddb_sfn_state_table.register_execution_start(callback_object, sql_statement)
+    with_event = not isinstance(callback_object, NoCallback)
+    if not with_event:
+        logger.info(f'No callback for {sql_statement}')
+    response = execute_statement(sql_statement, str(statement_name), with_event=with_event)
     logger.info({
         l_response: response,
-        EXECUTION_ARN: execution_arn
+        l_callback_object: callback_object
     })
     return response
 
@@ -116,15 +119,17 @@ def finished_data_api_request_record_handler(record: dict):
     """
     try:
         logger.debug(record)
-        finished_event_details_str = record['body']
-        finished_event_details = json.loads(finished_event_details_str)
-        execution_detail = finished_event_details['detail']
-        statement_name = StatementName.from_str(execution_detail['statementName'])
+        finished_event = FinishedEvent.from_record(record)
+        statement_name = StatementName.from_str(finished_event.get_statement_name())
+        callback_source = ddb_sfn_state_table.get_callback_source_for_statement_name(statement_name)
+        if finished_event.has_failed():
+            callback_source.send_failure(statement_name, finished_event)
+        elif finished_event.has_succeeded():
+            callback_source.send_success(statement_name, finished_event)
+        else:
+            raise NotImplementedError(f"Unsupported Data API finished event state {finished_event.get_state()}")
 
-        task_token = ddb_sfn_state_table.get_task_token_for_statement_name(statement_name)
-        StepFunctionAPI.send_outcome(task_token, finished_event_details)
-
-        ddb_sfn_state_table.mark_statement_name_as_handled(statement_name, finished_event_details)
+        ddb_sfn_state_table.mark_statement_name_as_handled(statement_name, finished_event)
     except StatementName.NoSfnStatementName:
         logger.info({
             l_record: record,

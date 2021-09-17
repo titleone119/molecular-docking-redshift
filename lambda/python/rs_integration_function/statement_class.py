@@ -23,6 +23,7 @@ class StatementName(object):
     MACHINE_NAME_IDX = 6
     EXECUTION_ID_IDX = 7
     INVOCATION_ID_IDX = 8  # Last element will be the invocaiton id.
+    LAST_ELEMENT_IDX = -1
 
     ARN = "arn"
     STATES = "states"
@@ -75,12 +76,10 @@ class StatementName(object):
 
     @classmethod
     def from_str(cls, statement_name: str):
-        if not cls._is_sfn_invocation(statement_name):
-            raise cls.NoSfnStatementName(statement_name)
         statement_name_parts = statement_name.split(':')
         return cls(
-            execution_arn=':'.join(statement_name_parts[:cls.INVOCATION_ID_IDX]),
-            invocation_id=statement_name_parts[cls.INVOCATION_ID_IDX]
+            execution_arn=':'.join(statement_name_parts[:cls.LAST_ELEMENT_IDX]),
+            invocation_id=statement_name_parts[cls.LAST_ELEMENT_IDX]
         )
 
     def __str__(self):

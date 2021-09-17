@@ -10,7 +10,7 @@ from callback_sources.helper import CallbackSource, NoCallback
 from ddb.ddb_state_table import DDBStateTable
 from exceptions import ConcurrentExecution, InvalidRequest
 from integration import sanitize_response
-from logger import logger, l_sanitized_response, l_response, l_record, l_message, l_traceback, l_exception, \
+from logger import logger, l_sanitized_response, l_response, l_record, l_traceback, l_exception, \
     l_callback_object
 from environment_labels import env_variable_labels
 from event_labels import (
@@ -95,7 +95,7 @@ def handle_redshift_statement_invocation(sql_statement: str, callback_object: Ca
     statement_name = ddb_sfn_state_table.register_execution_start(callback_object, sql_statement)
     with_event = not isinstance(callback_object, NoCallback)
     if not with_event:
-        logger.info(f'No callback for {sql_statement}')
+        logger.debug(f'No callback for {sql_statement}')
     response = execute_statement(sql_statement, str(statement_name), with_event=with_event)
     logger.info({
         l_response: response,
@@ -123,6 +123,13 @@ def finished_data_api_request_record_handler(record: dict):
         statement_name = StatementName.from_str(finished_event.get_statement_name())
         callback_source = ddb_sfn_state_table.get_callback_source_for_statement_name(statement_name)
         if finished_event.has_failed():
+            # noinspection PyBroadException
+            try:
+                statement_description = describe_statement(finished_event.get_statement_id())
+                error = statement_description["Error"]
+                finished_event['detail']['error'] = error
+            except Exception as ex:
+                logger.warn(f"Could not get error for {finished_event} due to {ex}")
             callback_source.send_failure(statement_name, finished_event)
         elif finished_event.has_succeeded():
             callback_source.send_success(statement_name, finished_event)
@@ -130,11 +137,6 @@ def finished_data_api_request_record_handler(record: dict):
             raise NotImplementedError(f"Unsupported Data API finished event state {finished_event.get_state()}")
 
         ddb_sfn_state_table.mark_statement_name_as_handled(statement_name, finished_event)
-    except StatementName.NoSfnStatementName:
-        logger.info({
-            l_record: record,
-            l_message: "This record was not started by a system that tracks state. No need to process."
-        })
     except Exception as e:
         logger.fatal({
             l_record: record,

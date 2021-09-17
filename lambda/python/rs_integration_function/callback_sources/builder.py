@@ -1,9 +1,13 @@
+# Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+# SPDX-License-Identifier: MIT-0
+
 from callback_sources.helper import NoCallback
 from callback_sources.sfn_source import SfnCallback
+from callback_sources.cfn_callback import CfnCallback
 
 
 class CallbackSourceBuilder(object):
-    sources = [SfnCallback]
+    sources = [SfnCallback, CfnCallback]
 
     @classmethod
     def get_callback_class_for_event(cls, event):

@@ -1,3 +1,6 @@
+# Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+# SPDX-License-Identifier: MIT-0
+
 import json
 
 
@@ -5,7 +8,7 @@ class FinishedEvent(dict):
     QUERY_FINISHED = "FINISHED"
     QUERY_FAILED = "FAILED"
     QUERY_ABORTED = "ABORTED"
-    
+
     def __init__(self, input_dict):
         super(FinishedEvent, self).__init__(input_dict)
 
@@ -20,6 +23,9 @@ class FinishedEvent(dict):
 
     def get_state(self) -> str:
         return self.get_execution_detail()['state']
+
+    def get_statement_id(self) -> str:
+        return self.get_execution_detail()['statementId']
 
     def get_statement_name(self) -> str:
         return self.get_execution_detail()['statementName']

@@ -1,17 +1,20 @@
 `cfn_manage_user_function` is a sample function that creates a Cloudformation custom resource that allows to manage
 Redshift users.
 
+# AWS Cloudformation Redshift integration
+For generic advice on a AWS Cloudformation Redshift integration see 
+[cloudformation_redshift_integration.md](/docs/cloudformation_redshift_integration.md).
 
-A Cloudformation custom resource has to be able to handle Create, Update & Delete `RequestType`s so a helper function 
-should be created in order to create a declarative cloudformation representation which will manage the user 
-correspondingly on Redshift. To do this generate the SQL depending on the `RequestType`. Since 
-`cdk-stepfunctions-redshift` provides a `CfnCallback` callback 
-[(code-link)](/lambda/python/rs_integration_function/callback_sources/cfn_callback.py#L9-L19) that takes care of 
+# How it works (with code examples)
+
+A Cloudformation custom resource has to be able to handle Create, Update & Delete `RequestType`s so a helper function
+should be created in order to create a declarative cloudformation representation which will manage the user
+correspondingly on Redshift. To do this generate the SQL depending on the `RequestType`. Since
+`cdk-stepfunctions-redshift` provides a `CfnCallback` callback
+[(code-link)](/lambda/python/rs_integration_function/callback_sources/cfn_callback.py#L9-L19) that takes care of
 performing the callback these custom resources only need to implement the logic to map Cloud formation representation to
 SQL statement. That means considering the `RequestType` (`Create`, `Delete`, `Update`) and the `ResourceProperties` to
 generate the SQL statement.
-
-# How it works (with code examples)
 
 1. A Lambda function is to be created out of this code [(code-link)](/src/integ.default.ts#L83-L88).
 2. This lambda function has to be granted invoke permissions for `SfnRedshiftTasker` lambda function 
@@ -21,7 +24,6 @@ generate the SQL statement.
    
 The properties passed in end up in `ResourceProperties` of the event that triggers the lambda function. For this example
 code the supported properties are in the [source code](/lambda/python/cfn_manage_user_function/index.py#L23-L31).
-
 
 # cfnresponse.py
 

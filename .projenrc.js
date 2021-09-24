@@ -62,6 +62,7 @@ const project = new AwsCdkConstructLibrary({
   },
 });
 
+// Artifact building differs from Mac and Linux so we don't add **/__pycache__ as it will result in different hashes
 const common_exclude = ['cdk.out', 'cdk.context.json', 'docker-compose.yml', 'yarn-error.log', '**/.idea', 'package-lock.json', '.projenrc.js.bak', 'version.json.bak'];
 project.npmignore.exclude(...common_exclude, '/codebase');
 project.gitignore.exclude(...common_exclude);

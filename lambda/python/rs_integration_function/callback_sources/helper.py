@@ -7,7 +7,7 @@ from redshift_data.finished_event import FinishedEvent
 from statement_class import StatementName
 
 
-class CallbackSource(dict, ABC):
+class CallbackInterface(dict, ABC):
     @classmethod
     @abstractmethod
     def get_id_name(cls) -> Union[str, None]:
@@ -41,7 +41,7 @@ class CallbackSource(dict, ABC):
         """
         We only want to track fields necessary for the callback
         """
-        super(CallbackSource, self).__init__()
+        super(CallbackInterface, self).__init__()
         for field_name in self.get_callback_fieldnames():
             self[field_name] = input_dict[field_name]
 
@@ -58,7 +58,7 @@ class CallbackSource(dict, ABC):
         """
 
 
-class NoCallback(CallbackSource):
+class NoCallback(CallbackInterface):
     @classmethod
     def get_id_name(cls) -> Union[str, None]:
         return None

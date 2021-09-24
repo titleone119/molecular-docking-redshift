@@ -1,12 +1,12 @@
 from typing import List
 
-from callback_sources.helper import CallbackSource
+from callback_sources.helper import CallbackInterface
 from redshift_data.finished_event import FinishedEvent
 from statement_class import StatementName
 from step_function.api import StepFunctionAPI
 
 
-class SfnCallback(CallbackSource):
+class SfnCallback(CallbackInterface):
     def send_success(self, statement_name: StatementName, event_details: FinishedEvent):
         StepFunctionAPI.send_task_success(self.get_task_token(), event_details)
 

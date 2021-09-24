@@ -4,7 +4,7 @@ import pytest as pytest
 
 from callback_sources.cfn_callback import CfnCallback
 from callback_sources.helper import NoCallback
-from callback_sources.sfn_source import SfnCallback
+from callback_sources.sfn_callback import SfnCallback
 from event_labels import TASK_TOKEN, EXECUTION_ARN, SQL_STATEMENT
 
 

@@ -11,7 +11,7 @@ from boto3.dynamodb.conditions import Key
 import os
 
 from callback_sources.builder import CallbackSourceBuilder
-from callback_sources.helper import CallbackSource, NoCallback
+from callback_sources.helper import CallbackInterface, NoCallback
 from exceptions import ConfigurationError, PreviousExecutionNotFound, NoTrackedState
 from statement_class import StatementName
 from ddb import DDB_ID, DDB_TABLE_NAME, DDB_TTL, DDB_FINISHED_EVENT_DETAILS, DDB_INVOCATION_ID, DDB_CALLBACK_DETAILS
@@ -61,7 +61,7 @@ class DDBStateTable(object):
         kwargs['Item'] = self.object_floats_to_decimal(kwargs['Item'])
         return ddb_state_table.put_item(*args, **kwargs)
 
-    def register_execution_start(self, callback_object: CallbackSource, sql_statement: str) -> StatementName:
+    def register_execution_start(self, callback_object: CallbackInterface, sql_statement: str) -> StatementName:
         """
         Register a UUID4 string in a state table in DynamoDB and link it with the task of the stepfunction execution.
         Return this GUID string such that it can be used as statement name to update the task when the statement
@@ -107,7 +107,7 @@ class DDBStateTable(object):
         )
 
     @classmethod
-    def get_callback_source_for_statement_name(cls, statement_name: StatementName) -> CallbackSource:
+    def get_callback_source_for_statement_name(cls, statement_name: StatementName) -> CallbackInterface:
         """
         This is a very efficient DDB lookup which will only consume 1 RCU.
         Args:

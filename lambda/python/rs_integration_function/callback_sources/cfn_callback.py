@@ -1,12 +1,12 @@
 from typing import List, Union
 
-from callback_sources.helper import CallbackSource
+from callback_sources.helper import CallbackInterface
 from redshift_data.finished_event import FinishedEvent
 from statement_class import StatementName
 import callback_sources.cfnresponse as cfn_response
 
 
-class CfnCallback(CallbackSource):
+class CfnCallback(CallbackInterface):
     """
     CfnCallback is a callback integration that allows notifying Cloudformation when a Redshift operation has finished.
     The event that should trigger the SfnRedshiftTasker lambdaFunction must have the required fields that Cloudformation

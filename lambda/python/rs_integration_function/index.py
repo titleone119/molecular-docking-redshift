@@ -6,7 +6,7 @@ import traceback
 from aws_lambda_powertools.utilities.batch import sqs_batch_processor
 
 from callback_sources.builder import CallbackSourceBuilder
-from callback_sources.helper import CallbackSource, NoCallback
+from callback_sources.helper import CallbackInterface, NoCallback
 from ddb.ddb_state_table import DDBStateTable
 from exceptions import ConcurrentExecution, InvalidRequest
 from integration import sanitize_response
@@ -89,7 +89,7 @@ def handle_redshift_statement_invocation_event(event):
         raise InvalidRequest(f"Unsupported {ACTION} to execute sql_statement {event}")
 
 
-def handle_redshift_statement_invocation(sql_statement: str, callback_object: CallbackSource, run_as_singleton=False):
+def handle_redshift_statement_invocation(sql_statement: str, callback_object: CallbackInterface, run_as_singleton=False):
     if run_as_singleton and is_statement_in_active_state(sql_statement):
         raise ConcurrentExecution(f"There is already an instance of {sql_statement} running.")
     statement_name = ddb_sfn_state_table.register_execution_start(callback_object, sql_statement)

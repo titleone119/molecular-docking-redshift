@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: MIT-0
 
 from callback_sources.helper import NoCallback
-from callback_sources.sfn_source import SfnCallback
+from callback_sources.sfn_callback import SfnCallback
 from callback_sources.cfn_callback import CfnCallback
 
 

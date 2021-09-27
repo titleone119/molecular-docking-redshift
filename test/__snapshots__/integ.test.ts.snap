@@ -15,28 +15,28 @@ Object {
       "Description": "S3 key for asset version \\"67b7823b74bc135986aa72f889d6a8da058d0c4a20cbc2dfc6f78995fdd2fc24\\"",
       "Type": "String",
     },
-    "AssetParameters88f7ea88232d26e2c545a0d928eb02b314db47b78e340960e5f404f3c0d9ed02ArtifactHashA9DE0E1A": Object {
-      "Description": "Artifact hash for asset \\"88f7ea88232d26e2c545a0d928eb02b314db47b78e340960e5f404f3c0d9ed02\\"",
+    "AssetParametersc8264ab355c00ad16ac15850026c911fc7900652bfb2028be2f229dcaf216644ArtifactHash4979723C": Object {
+      "Description": "Artifact hash for asset \\"c8264ab355c00ad16ac15850026c911fc7900652bfb2028be2f229dcaf216644\\"",
       "Type": "String",
     },
-    "AssetParameters88f7ea88232d26e2c545a0d928eb02b314db47b78e340960e5f404f3c0d9ed02S3BucketE2934F94": Object {
-      "Description": "S3 bucket for asset \\"88f7ea88232d26e2c545a0d928eb02b314db47b78e340960e5f404f3c0d9ed02\\"",
+    "AssetParametersc8264ab355c00ad16ac15850026c911fc7900652bfb2028be2f229dcaf216644S3Bucket44E297B9": Object {
+      "Description": "S3 bucket for asset \\"c8264ab355c00ad16ac15850026c911fc7900652bfb2028be2f229dcaf216644\\"",
       "Type": "String",
     },
-    "AssetParameters88f7ea88232d26e2c545a0d928eb02b314db47b78e340960e5f404f3c0d9ed02S3VersionKey237B1A2F": Object {
-      "Description": "S3 key for asset version \\"88f7ea88232d26e2c545a0d928eb02b314db47b78e340960e5f404f3c0d9ed02\\"",
+    "AssetParametersc8264ab355c00ad16ac15850026c911fc7900652bfb2028be2f229dcaf216644S3VersionKey052BE09D": Object {
+      "Description": "S3 key for asset version \\"c8264ab355c00ad16ac15850026c911fc7900652bfb2028be2f229dcaf216644\\"",
       "Type": "String",
     },
-    "AssetParametersc7637abb1d2b3a393107aad780f59bd43675786bdb723d8ce75dd9a39ee742b3ArtifactHash527999E5": Object {
-      "Description": "Artifact hash for asset \\"c7637abb1d2b3a393107aad780f59bd43675786bdb723d8ce75dd9a39ee742b3\\"",
+    "AssetParametersf358fdfdaa95ce9bdab9250a6ab07b563c8c41816a5106090fd437c59853abb3ArtifactHash857DDE9B": Object {
+      "Description": "Artifact hash for asset \\"f358fdfdaa95ce9bdab9250a6ab07b563c8c41816a5106090fd437c59853abb3\\"",
       "Type": "String",
     },
-    "AssetParametersc7637abb1d2b3a393107aad780f59bd43675786bdb723d8ce75dd9a39ee742b3S3BucketA9913055": Object {
-      "Description": "S3 bucket for asset \\"c7637abb1d2b3a393107aad780f59bd43675786bdb723d8ce75dd9a39ee742b3\\"",
+    "AssetParametersf358fdfdaa95ce9bdab9250a6ab07b563c8c41816a5106090fd437c59853abb3S3Bucket68AA6581": Object {
+      "Description": "S3 bucket for asset \\"f358fdfdaa95ce9bdab9250a6ab07b563c8c41816a5106090fd437c59853abb3\\"",
       "Type": "String",
     },
-    "AssetParametersc7637abb1d2b3a393107aad780f59bd43675786bdb723d8ce75dd9a39ee742b3S3VersionKeyF12160FA": Object {
-      "Description": "S3 key for asset version \\"c7637abb1d2b3a393107aad780f59bd43675786bdb723d8ce75dd9a39ee742b3\\"",
+    "AssetParametersf358fdfdaa95ce9bdab9250a6ab07b563c8c41816a5106090fd437c59853abb3S3VersionKey0721CF1E": Object {
+      "Description": "S3 key for asset version \\"f358fdfdaa95ce9bdab9250a6ab07b563c8c41816a5106090fd437c59853abb3\\"",
       "Type": "String",
     },
   },
@@ -641,6 +641,125 @@ Object {
       },
       "Type": "AWS::IAM::Policy",
     },
+    "RSCreateDrop2F4DA6CE": Object {
+      "DependsOn": Array [
+        "RSCreateDropServiceRoleDefaultPolicyB1F81F92",
+        "RSCreateDropServiceRole2EF26705",
+      ],
+      "Properties": Object {
+        "Code": Object {
+          "S3Bucket": Object {
+            "Ref": "AssetParametersc8264ab355c00ad16ac15850026c911fc7900652bfb2028be2f229dcaf216644S3Bucket44E297B9",
+          },
+          "S3Key": Object {
+            "Fn::Join": Array [
+              "",
+              Array [
+                Object {
+                  "Fn::Select": Array [
+                    0,
+                    Object {
+                      "Fn::Split": Array [
+                        "||",
+                        Object {
+                          "Ref": "AssetParametersc8264ab355c00ad16ac15850026c911fc7900652bfb2028be2f229dcaf216644S3VersionKey052BE09D",
+                        },
+                      ],
+                    },
+                  ],
+                },
+                Object {
+                  "Fn::Select": Array [
+                    1,
+                    Object {
+                      "Fn::Split": Array [
+                        "||",
+                        Object {
+                          "Ref": "AssetParametersc8264ab355c00ad16ac15850026c911fc7900652bfb2028be2f229dcaf216644S3VersionKey052BE09D",
+                        },
+                      ],
+                    },
+                  ],
+                },
+              ],
+            ],
+          },
+        },
+        "Environment": Object {
+          "Variables": Object {
+            "CDK_STEPFUNCTIONS_REDSHIFT_LAMBDA": Object {
+              "Ref": "RSTaskRSInvokerLambdaFunction76AA46C6",
+            },
+          },
+        },
+        "Handler": "create_drop.handler",
+        "Role": Object {
+          "Fn::GetAtt": Array [
+            "RSCreateDropServiceRole2EF26705",
+            "Arn",
+          ],
+        },
+        "Runtime": "python3.8",
+      },
+      "Type": "AWS::Lambda::Function",
+    },
+    "RSCreateDropServiceRole2EF26705": Object {
+      "Properties": Object {
+        "AssumeRolePolicyDocument": Object {
+          "Statement": Array [
+            Object {
+              "Action": "sts:AssumeRole",
+              "Effect": "Allow",
+              "Principal": Object {
+                "Service": "lambda.amazonaws.com",
+              },
+            },
+          ],
+          "Version": "2012-10-17",
+        },
+        "ManagedPolicyArns": Array [
+          Object {
+            "Fn::Join": Array [
+              "",
+              Array [
+                "arn:",
+                Object {
+                  "Ref": "AWS::Partition",
+                },
+                ":iam::aws:policy/service-role/AWSLambdaBasicExecutionRole",
+              ],
+            ],
+          },
+        ],
+      },
+      "Type": "AWS::IAM::Role",
+    },
+    "RSCreateDropServiceRoleDefaultPolicyB1F81F92": Object {
+      "Properties": Object {
+        "PolicyDocument": Object {
+          "Statement": Array [
+            Object {
+              "Action": "lambda:InvokeFunction",
+              "Effect": "Allow",
+              "Resource": Object {
+                "Fn::GetAtt": Array [
+                  "RSTaskRSInvokerLambdaFunction76AA46C6",
+                  "Arn",
+                ],
+              },
+            },
+          ],
+          "Version": "2012-10-17",
+        },
+        "PolicyName": "RSCreateDropServiceRoleDefaultPolicyB1F81F92",
+        "Roles": Array [
+          Object {
+            "Ref": "RSCreateDropServiceRole2EF26705",
+          },
+        ],
+      },
+      "Type": "AWS::IAM::Policy",
+    },
     "RSTaskPowertools84336D63": Object {
       "Properties": Object {
         "Location": Object {
@@ -1012,7 +1131,7 @@ Object {
       "Properties": Object {
         "Code": Object {
           "S3Bucket": Object {
-            "Ref": "AssetParameters88f7ea88232d26e2c545a0d928eb02b314db47b78e340960e5f404f3c0d9ed02S3BucketE2934F94",
+            "Ref": "AssetParametersf358fdfdaa95ce9bdab9250a6ab07b563c8c41816a5106090fd437c59853abb3S3Bucket68AA6581",
           },
           "S3Key": Object {
             "Fn::Join": Array [
@@ -1025,7 +1144,7 @@ Object {
                       "Fn::Split": Array [
                         "||",
                         Object {
-                          "Ref": "AssetParameters88f7ea88232d26e2c545a0d928eb02b314db47b78e340960e5f404f3c0d9ed02S3VersionKey237B1A2F",
+                          "Ref": "AssetParametersf358fdfdaa95ce9bdab9250a6ab07b563c8c41816a5106090fd437c59853abb3S3VersionKey0721CF1E",
                         },
                       ],
                     },
@@ -1038,7 +1157,7 @@ Object {
                       "Fn::Split": Array [
                         "||",
                         Object {
-                          "Ref": "AssetParameters88f7ea88232d26e2c545a0d928eb02b314db47b78e340960e5f404f3c0d9ed02S3VersionKey237B1A2F",
+                          "Ref": "AssetParametersf358fdfdaa95ce9bdab9250a6ab07b563c8c41816a5106090fd437c59853abb3S3VersionKey0721CF1E",
                         },
                       ],
                     },
@@ -1338,7 +1457,7 @@ Object {
       "Properties": Object {
         "Code": Object {
           "S3Bucket": Object {
-            "Ref": "AssetParameters88f7ea88232d26e2c545a0d928eb02b314db47b78e340960e5f404f3c0d9ed02S3BucketE2934F94",
+            "Ref": "AssetParametersf358fdfdaa95ce9bdab9250a6ab07b563c8c41816a5106090fd437c59853abb3S3Bucket68AA6581",
           },
           "S3Key": Object {
             "Fn::Join": Array [
@@ -1351,7 +1470,7 @@ Object {
                       "Fn::Split": Array [
                         "||",
                         Object {
-                          "Ref": "AssetParameters88f7ea88232d26e2c545a0d928eb02b314db47b78e340960e5f404f3c0d9ed02S3VersionKey237B1A2F",
+                          "Ref": "AssetParametersf358fdfdaa95ce9bdab9250a6ab07b563c8c41816a5106090fd437c59853abb3S3VersionKey0721CF1E",
                         },
                       ],
                     },
@@ -1364,7 +1483,7 @@ Object {
                       "Fn::Split": Array [
                         "||",
                         Object {
-                          "Ref": "AssetParameters88f7ea88232d26e2c545a0d928eb02b314db47b78e340960e5f404f3c0d9ed02S3VersionKey237B1A2F",
+                          "Ref": "AssetParametersf358fdfdaa95ce9bdab9250a6ab07b563c8c41816a5106090fd437c59853abb3S3VersionKey0721CF1E",
                         },
                       ],
                     },
@@ -1598,7 +1717,7 @@ Object {
       "Properties": Object {
         "Code": Object {
           "S3Bucket": Object {
-            "Ref": "AssetParametersc7637abb1d2b3a393107aad780f59bd43675786bdb723d8ce75dd9a39ee742b3S3BucketA9913055",
+            "Ref": "AssetParametersc8264ab355c00ad16ac15850026c911fc7900652bfb2028be2f229dcaf216644S3Bucket44E297B9",
           },
           "S3Key": Object {
             "Fn::Join": Array [
@@ -1611,7 +1730,7 @@ Object {
                       "Fn::Split": Array [
                         "||",
                         Object {
-                          "Ref": "AssetParametersc7637abb1d2b3a393107aad780f59bd43675786bdb723d8ce75dd9a39ee742b3S3VersionKeyF12160FA",
+                          "Ref": "AssetParametersc8264ab355c00ad16ac15850026c911fc7900652bfb2028be2f229dcaf216644S3VersionKey052BE09D",
                         },
                       ],
                     },
@@ -1624,7 +1743,7 @@ Object {
                       "Fn::Split": Array [
                         "||",
                         Object {
-                          "Ref": "AssetParametersc7637abb1d2b3a393107aad780f59bd43675786bdb723d8ce75dd9a39ee742b3S3VersionKeyF12160FA",
+                          "Ref": "AssetParametersc8264ab355c00ad16ac15850026c911fc7900652bfb2028be2f229dcaf216644S3VersionKey052BE09D",
                         },
                       ],
                     },
@@ -1641,7 +1760,7 @@ Object {
             },
           },
         },
-        "Handler": "index.handler",
+        "Handler": "manage_user.handler",
         "Role": Object {
           "Fn::GetAtt": Array [
             "RSUserManagerServiceRole2D76427D",
@@ -2445,7 +2564,7 @@ Object {
         },
         "connection_limit": 3,
         "create_db": true,
-        "create_user": true,
+        "create_user": false,
         "groups": Array [
           "group_a",
           "group_b",
@@ -2455,6 +2574,39 @@ Object {
         "unrestricted_syslog_access": true,
         "username": "cfncreated_user",
         "valid_until": "2025-01-01 12:00:00",
+      },
+      "Type": "AWS::CloudFormation::CustomResource",
+      "UpdateReplacePolicy": "Delete",
+    },
+    "rstable": Object {
+      "DeletionPolicy": "Delete",
+      "Properties": Object {
+        "ServiceToken": Object {
+          "Fn::GetAtt": Array [
+            "RSCreateDrop2F4DA6CE",
+            "Arn",
+          ],
+        },
+        "create_sql": "create table my_table(id int, value varchar(50));",
+        "drop_sql": "drop table if exists my_table;",
+      },
+      "Type": "AWS::CloudFormation::CustomResource",
+      "UpdateReplacePolicy": "Delete",
+    },
+    "rsview": Object {
+      "DeletionPolicy": "Delete",
+      "DependsOn": Array [
+        "rstable",
+      ],
+      "Properties": Object {
+        "ServiceToken": Object {
+          "Fn::GetAtt": Array [
+            "RSCreateDrop2F4DA6CE",
+            "Arn",
+          ],
+        },
+        "create_sql": "create view my_view as (select id from my_table);",
+        "drop_sql": "drop view if exists my_view;",
       },
       "Type": "AWS::CloudFormation::CustomResource",
       "UpdateReplacePolicy": "Delete",

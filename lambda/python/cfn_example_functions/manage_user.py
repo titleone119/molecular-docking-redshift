@@ -11,8 +11,6 @@ from logger import logger
 import cfnresponse
 
 
-CFN_SUCCESS = "SUCCESS"
-CFN_FAILED = "FAILED"
 CFN_RESOURCE_PROPERTIES = "ResourceProperties"
 CFN_OLD_RESOURCE_PROPERTIES = "OldResourceProperties"
 CFN_REQUEST_TYPE = "RequestType"

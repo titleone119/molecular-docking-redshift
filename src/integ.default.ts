@@ -80,21 +80,22 @@ export class IntegTesting {
       },
     );
 
+    let exampleFunctionsCode = Code.fromAsset(path.join(__dirname, '../lambda/python/cfn_example_functions'));
     let rs_user_manager = new lambda.Function(stack, 'RSUserManager', {
       runtime: Runtime.PYTHON_3_8,
-      handler: 'index.handler',
-      code: Code.fromAsset(path.join(__dirname, '../lambda/python/cfn_manage_user_function')),
+      handler: 'manage_user.handler',
+      code: exampleFunctionsCode,
       environment: { CDK_STEPFUNCTIONS_REDSHIFT_LAMBDA: rs_task_helper.lambdaFunction.functionName },
     });
     rs_task_helper.lambdaFunction.grantInvoke(rs_user_manager);
 
-    new CustomResource(stack, 'rs_cfncreated user', {
+    new CustomResource(stack, 'rs_cfncreated_user', {
       serviceToken: rs_user_manager.functionArn,
       properties: {
         username: 'cfncreated_user',
         password: 'md5e1c252bf4c426727db9c7bfc726760d8', //Note that this would require all password changes to pass through CFN.
         create_db: true,
-        create_user: true,
+        create_user: false,
         unrestricted_syslog_access: true,
         groups: ['group_a', 'group_b'],
         valid_until: '2025-01-01 12:00:00',
@@ -102,6 +103,33 @@ export class IntegTesting {
         session_timeout: 1728000,
       },
     });
+
+    let rs_create_drop = new lambda.Function(stack, 'RSCreateDrop', {
+      runtime: Runtime.PYTHON_3_8,
+      handler: 'create_drop.handler',
+      code: exampleFunctionsCode,
+      environment: { CDK_STEPFUNCTIONS_REDSHIFT_LAMBDA: rs_task_helper.lambdaFunction.functionName },
+    });
+    rs_task_helper.lambdaFunction.grantInvoke(rs_create_drop);
+
+    // Create a table
+    let rsTable = new CustomResource(stack, 'rs_table', {
+      serviceToken: rs_create_drop.functionArn,
+      properties: {
+        create_sql: 'create table my_table(id int, value varchar(50));',
+        drop_sql: 'drop table if exists my_table;',
+      },
+    });
+
+    // Create a view that depends on the table
+    let rsView = new CustomResource(stack, 'rs_view', {
+      serviceToken: rs_create_drop.functionArn,
+      properties: {
+        create_sql: 'create view my_view as (select id from my_table);',
+        drop_sql: 'drop view if exists my_view;',
+      },
+    });
+    rsView.node.addDependency(rsTable); // Explicitly put dependencies!
 
     let chainedMachine = new ChainedMachine(stack);
     chainedMachine.push_front('singleFailure', new SingleFailureMachine(stack, rs_task_helper2.lambdaFunction).definition);

@@ -4,6 +4,7 @@
 !/.projen/deps.json
 !/.github/workflows/stale.yml
 !/package.json
+!/LICENSE
 !/.npmignore
 logs
 *.log

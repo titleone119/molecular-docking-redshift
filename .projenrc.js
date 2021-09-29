@@ -42,7 +42,9 @@ const project = new AwsCdkConstructLibrary({
   ],
   eslint: true,
   keywords: ['cdk', 'redshift', 'stepfunction', 'orchestration'],
-  licensed: false,
+  license: 'MIT-0',
+  copyrightPeriod: '',
+  copyrightOwner: 'Amazon.com, Inc. or its affiliates. All Rights Reserved.',
   defaultReleaseBranch: 'release',
   pullRequestTemplateContents: [
     '---',

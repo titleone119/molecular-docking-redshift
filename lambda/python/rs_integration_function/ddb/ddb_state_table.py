@@ -10,10 +10,12 @@ import boto3
 from boto3.dynamodb.conditions import Key
 import os
 
+from callback_sources.builder import CallbackSourceBuilder
+from callback_sources.helper import CallbackInterface, NoCallback
 from exceptions import ConfigurationError, PreviousExecutionNotFound, NoTrackedState
 from statement_class import StatementName
-from ddb import DDB_ID, DDB_TABLE_NAME, DDB_TTL, DDB_FINISHED_EVENT_DETAILS, DDB_INVOCATION_ID
-from event_labels import TASK_TOKEN, SQL_STATEMENT, EXECUTION_ARN
+from ddb import DDB_ID, DDB_TABLE_NAME, DDB_TTL, DDB_FINISHED_EVENT_DETAILS, DDB_INVOCATION_ID, DDB_CALLBACK_DETAILS
+from event_labels import SQL_STATEMENT
 from assertion import assert_env_set
 from logger import logger, l_statement_name, l_response, l_finished_event_details, l_ttl, l_item, l_exception
 
@@ -59,26 +61,22 @@ class DDBStateTable(object):
         kwargs['Item'] = self.object_floats_to_decimal(kwargs['Item'])
         return ddb_state_table.put_item(*args, **kwargs)
 
-    def register_execution_start(self, task_token: str, execution_arn: str, sql_statement: str) -> StatementName:
+    def register_execution_start(self, callback_object: CallbackInterface, sql_statement: str) -> StatementName:
         """
         Register a UUID4 string in a state table in DynamoDB and link it with the task of the stepfunction execution.
         Return this GUID string such that it can be used as statement name to update the task when the statement
         completes.
         """
-        statement_name = StatementName.from_execution_arn(execution_arn)
+        statement_name = StatementName.from_execution_arn(callback_object.get_id())
         item_details = {
             DDB_ID: statement_name.execution_arn,
             DDB_INVOCATION_ID: statement_name.invocation_id,
             SQL_STATEMENT: sql_statement,
+            DDB_CALLBACK_DETAILS: callback_object.to_json()
         }
-        if task_token is None:
-            # If no task_token provided no callback is expected so TTL can immediately be set.
+        if isinstance(callback_object, NoCallback):
+            # No callback is expected so TTL can immediately be set.
             item_details[DDB_TTL] = self.get_ttl_value()
-        else:
-            # If invoking from SFN the execution ARN should be valid. Make it hard requirement to enforce lineage.
-            invalid_arn_msg = f"Usage of {TASK_TOKEN} requires valid SFN {EXECUTION_ARN} got {execution_arn}."
-            assert statement_name.is_sfn_invocation(), invalid_arn_msg
-            item_details[TASK_TOKEN] = task_token
         logger.debug({l_item: item_details})
         self.put_item(
             Item=item_details,
@@ -109,7 +107,7 @@ class DDBStateTable(object):
         )
 
     @classmethod
-    def get_task_token_for_statement_name(cls, statement_name: StatementName) -> str:
+    def get_callback_source_for_statement_name(cls, statement_name: StatementName) -> CallbackInterface:
         """
         This is a very efficient DDB lookup which will only consume 1 RCU.
         Args:
@@ -124,7 +122,7 @@ class DDBStateTable(object):
                 DDB_INVOCATION_ID: statement_name.invocation_id,
             },
             AttributesToGet=[
-                TASK_TOKEN,
+                DDB_CALLBACK_DETAILS,
             ],
             ConsistentRead=True,
             ReturnConsumedCapacity='NONE',
@@ -134,7 +132,9 @@ class DDBStateTable(object):
             l_response: response
         })
         try:
-            return response['Item'][TASK_TOKEN]
+            return CallbackSourceBuilder.get_callback_object_for_event(
+                json.loads(response['Item'][DDB_CALLBACK_DETAILS])
+            )
         except KeyError as ke:
             raise NoTrackedState(f"No state for {statement_name}") from ke
 

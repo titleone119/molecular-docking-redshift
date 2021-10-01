@@ -5,6 +5,7 @@
 from aws_lambda_powertools import Logger
 
 # Labels used as log keys, alphabetically
+l_callback_object = 'callback_object'
 l_default = 'default'
 l_exception = 'exception'
 l_finished_event_details = 'finished_event_details'

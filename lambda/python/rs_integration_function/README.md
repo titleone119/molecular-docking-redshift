@@ -9,12 +9,11 @@ supported operations and the event structures that invoke them.
 
 ### `executeStatement`
 
-#### Event example
+#### Event example for invocation
 ```yaml
 action: executeSingletonStatement
 sqlStatement: "call sp_my_proc(4);"
-executionArn: "arn:aws:states:eu-west-1:012345678910:execution:MachineName:fb69bfdf-e22c-4362-8f9e-48fb72c445b7"
-taskToken: "AAAAKgAAAAIAAAAAAAAAAUMsn4ME...1wlWClf+m0JU="
+executionArn: "arn:aws:lambda:eu-west-1:012345678910:function:functionInteractingWithRS"
 ```
 
 #### Detail
@@ -22,16 +21,17 @@ taskToken: "AAAAKgAAAAIAAAAAAAAAAUMsn4ME...1wlWClf+m0JU="
 Executing a statement can be done via 2 actions: 
  - `executeStatement` allows concurrent executions of a statement 
  - `executeSingletonStatement` will make sure no concurrent statement with the same SQL Statement text is running. If
-    there is such a concurrent statement a `ConcurrentExecution` exception is raised.
+    there is such a concurrent statement a `ConcurrentExecution` exception is raised. This requires that the AWS Lambda 
+    function is configured with a concurrency of 1 (the default)!
    
-Using `sqlStatement` the statement to be issued is specified.
+Specify the statement to be issued via the `sqlStatement` parameter.
 
-It is a best practice to provide an `executionArn` and set it to the ARN of the resources that requests the Redshift
-interaction (e.g. the ARN of a statemachine invocation).
+When invoking from a place where you control call arguments it is a best practice to provide an `executionArn` and set
+it to the ARN of the resources that requests the Redshift interaction. 
 
-Stepfunctions can use the [`waitForTaskToken`](https://docs.aws.amazon.com/step-functions/latest/dg/connect-to-resource.html#connect-wait-token)
-integration pattern. It requires passing `taskToken` and `executionArn` to the payload. For that the Context Object
-can be used so the `Payload` parameter will look like:
+Stepfunctions preferably use the [`waitForTaskToken`](https://docs.aws.amazon.com/step-functions/latest/dg/connect-to-resource.html#connect-wait-token)
+integration pattern. Invocation from step functions requires passing `taskToken` and `executionArn` to the payload. For
+that the Context Object can be used so the `Payload` parameter will look like:
 ```json
 {
   "action": "executeStatement",
@@ -40,6 +40,8 @@ can be used so the `Payload` parameter will look like:
   "executionArn.$": "$$.Execution.Id"  
 }
 ```
+See the [stepfunction_redshift_integration](/docs/stepfunction_redshift_integration.md) documentation for a more 
+elaborate example.
 
 ### `describeStatement`
 
@@ -51,7 +53,8 @@ statementId: "000c3360-dbc6-469f-894e-e4d869b0aea9"
 
 #### Detail
 
-Describe the statement that has ID `statementId`.  The result follows the [response syntax of DescribeStatement](https://docs.aws.amazon.com/redshift-data/latest/APIReference/API_DescribeStatement.html#API_DescribeStatement_ResponseSyntax)
+Describe the statement that has ID `statementId`.  The result follows the [response syntax of DescribeStatement](
+https://docs.aws.amazon.com/redshift-data/latest/APIReference/API_DescribeStatement.html#API_DescribeStatement_ResponseSyntax)
  from the Redshift Data API.
 
 Stepfunctions can use `"statementId": "LATEST"` to describe the last `executeStatement` that passed an `executionArn`.
@@ -76,7 +79,8 @@ statementId: "000c3360-dbc6-469f-894e-e4d869b0aea9"
 
 #### Detail
 
-Cancel the statement that has ID `statementId`.  The result follows the [response syntax of CancelStatement](https://docs.aws.amazon.com/redshift-data/latest/APIReference/API_CancelStatement.html#API_CancelStatement_ResponseElements)
+Cancel the statement that has ID `statementId`.  The result follows the [response syntax of CancelStatement](
+https://docs.aws.amazon.com/redshift-data/latest/APIReference/API_CancelStatement.html#API_CancelStatement_ResponseElements)
 from the Redshift Data API.
 
 Stepfunctions can use `"statementId": "LATEST"` to describe the last `executeStatement` that passed an `executionArn`.
@@ -101,7 +105,8 @@ statementId: "000c3360-dbc6-469f-894e-e4d869b0aea9"
 
 #### Detail
 
-Get the results of the execution that had ID `statementId`.  The result follows the [response syntax of GetStatementResult](https://docs.aws.amazon.com/redshift-data/latest/APIReference/API_GetStatementResult.html#API_GetStatementResult_ResponseElements)
+Get the results of the execution that had ID `statementId`.  The result follows the 
+[response syntax of GetStatementResult](https://docs.aws.amazon.com/redshift-data/latest/APIReference/API_GetStatementResult.html#API_GetStatementResult_ResponseElements)
 from the Redshift Data API.
 
 Stepfunctions can use `"statementId": "LATEST"` to get the results of the last `executeStatement` that passed an 

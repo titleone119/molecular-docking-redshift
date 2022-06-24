@@ -74,9 +74,9 @@ export class IntegTesting {
           dbName: redshiftDbName,
           clusterIdentifier: cluster.clusterName,
         },
-        existingTableObj: rs_task_helper.trackingTable,
+        existingTableObj: rs_task_helper.trackingTable,// use existing tracking table created in helper1
         createCallbackInfra: false,
-        powertoolsArn: rs_task_helper.powertoolsArn,
+        powertoolsArn: rs_task_helper.powertoolsArn,  //use existing powertoll created in helper1
       },
     );
 
@@ -97,7 +97,7 @@ export class IntegTesting {
         create_db: true,
         create_user: false,
         unrestricted_syslog_access: true,
-        groups: ['group_a', 'group_b'],
+        groups: [], // must be the existing group name of rs cluster! check by command
         valid_until: '2025-01-01 12:00:00',
         connection_limit: 3,
         session_timeout: 1728000,

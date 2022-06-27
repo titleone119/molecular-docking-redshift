@@ -11,8 +11,10 @@ import * as cdk from '@aws-cdk/core';
 import { CustomResource } from '@aws-cdk/core';
 import { SfnRedshiftTasker } from './index';
 
+import { IResource, LambdaIntegration, MockIntegration, PassthroughBehavior, RestApi } from '@aws-cdk/aws-apigateway';
 
-export class IntegTesting {
+
+export class MolecularDb {
   readonly stack: cdk.Stack[];
 
   constructor() {
@@ -77,13 +79,13 @@ export class IntegTesting {
     new CustomResource(stack, 'molecular_data_table', {
       serviceToken: rs_create_drop.functionArn,
       properties: {
-        create_sql: 'CREATE TABLE "public"."molecular_data"(id BIGINT IDENTITY(1,1) , ' +
+        create_sql: 'CREATE TABLE "public"."molecular_data"(id BIGINT IDENTITY(1,1), ' +
                      'title      character varying(256) encode lzo,' +
                      'smiles     character varying(256) encode lzo,' + 
                      'format     character varying(256) encode lzo,' + 
                      'source     character varying(256) encode lzo,' + 
                      'category   character varying(256) encode lzo,' + 
-                     ' atoms      integer encode az64,' + 
+                     'atoms      integer encode az64,' + 
   									 'abonds  numeric(18,0) encode az64,' + 
   									 'bonds numeric(18,0) encode az64,' + 
   									 'cansmi numeric(18,0) encode az64,' + 
@@ -105,8 +107,8 @@ export class IntegTesting {
                      'dim        character varying(8) encode lzo,' + 
                      'energy     numeric(18,0) encode az64,' + 
                      'exactmass  double precision,' + 
-                      'file_data  binary varying(1000000) encode lzo,' + 
-                      'CONSTRAINT molecular_data_pkey PRIMARY KEY(id));',
+                     'file_data  binary varying(1000000) encode lzo,' + 
+                     'CONSTRAINT molecular_data_pkey PRIMARY KEY(id));',
         drop_sql: 'drop table if exists "public"."molecular_data";',
       },
     });
@@ -121,12 +123,62 @@ export class IntegTesting {
     });
     rs_task_helper.lambdaFunction.grantInvoke(insert_mol_json);
 
-    //insert_mol_json.functionArn to be used!
     
+    let mol_object_func = new lambda.Function(stack, 'mol_object_function', {
+      runtime: Runtime.PYTHON_3_8,
+      handler: 'mol_object.handler',
+      code: exampleFunctionsCode,
+      environment: { CDK_STEPFUNCTIONS_REDSHIFT_LAMBDA: rs_task_helper.lambdaFunction.functionName },
+    });
+    rs_task_helper.lambdaFunction.grantInvoke(mol_object_func);
+  
+    
+    // Integrate the Lambda functions with the API Gateway resource
+    const mol_objects = new LambdaIntegration(mol_object_func);
+    //const getMolList = new LambdaIntegration(mol_object_func);
 
+    // Create an API Gateway resource for each of the CRUD operations
+    const api = new RestApi(stack, 'molecularApi', {
+      restApiName: 'Molecular Api Service'
+    });
+
+    const items = api.root.addResource('mols');
+    items.addMethod('POST', mol_objects);
+    addCorsOptions(items);
+    
     this.stack = [stack];
   }
 }
 
+export function addCorsOptions(apiResource: IResource) {
+  apiResource.addMethod('OPTIONS', new MockIntegration({
+    integrationResponses: [{
+      statusCode: '200',
+      responseParameters: {
+        'method.response.header.Access-Control-Allow-Headers': "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,X-Amz-User-Agent'",
+        'method.response.header.Access-Control-Allow-Origin': "'*'",
+        'method.response.header.Access-Control-Allow-Credentials': "'false'",
+        'method.response.header.Access-Control-Allow-Methods': "'OPTIONS,GET,PUT,POST,DELETE'",
+      },
+    }],
+    passthroughBehavior: PassthroughBehavior.NEVER,
+    requestTemplates: {
+      "application/json": "{\"statusCode\": 200}"
+    },
+  }), {
+    methodResponses: [{
+      statusCode: '200',
+      responseParameters: {
+        'method.response.header.Access-Control-Allow-Headers': true,
+        'method.response.header.Access-Control-Allow-Methods': true,
+        'method.response.header.Access-Control-Allow-Credentials': true,
+        'method.response.header.Access-Control-Allow-Origin': true,
+      },
+    }]
+  })
+}
+
+
+
 // run the integ testing
-new IntegTesting();
+new MolecularDb();

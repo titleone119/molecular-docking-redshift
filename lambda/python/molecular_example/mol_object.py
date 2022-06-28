@@ -40,19 +40,26 @@ def handler(event, context):
           ]
         }
     '''
+    logger.info(event)
+    print('event......')
+    event = json.loads(event['body']) 
+    print(json.dumps(event))
     
-    event = json.loads(event["body"])
+    if not isinstance(event,dict):
+        event = json.loads(event)
+    
+    
     logger.info("event:" + json.dumps(event))
     
     #operations = ['insert','delete','unload','load']
     
-    if "operation" not in event: 
+    if not has_value(event,'operation'): 
         return {
             'statusCode': 400,
-            'body': json.dumps('No valid operation requested')
+            'body': 'No valid operation requested'
         }
     
-    operation = event["operation"]
+    operation = event['operation']
     
     if "Records" not in event :
         return {
@@ -141,8 +148,7 @@ def do_unload(records : list):
 def do_insert(records : list):
     
     ##make the sql statement
-    sql_statement = '''insert into "public"."molecular_data"(title,smiles,format,source,category,atoms,abonds,bonds,formula,hba1,hba2,hbd, 
-                        inchi,inchikey,l5,logp,mp,mr,mw,tpsa,charge,dim,energy,exactmass,file_data) values 
+    sql_statement = '''insert into "public"."molecular_data"(title,smiles,format,source,category,atoms,abonds,bonds,formula,hba1,hba2,hbd, inchi,inchikey,l5,logp,mp,mr,mw,tpsa,charge,dim,energy,exactmass,file_data) values 
                     ''' 
     
     index = 0                    
@@ -190,7 +196,11 @@ def execute_sql(sql_stm):
         # )
         
         # Must decode the payload
+        logger.info("done exuecting....")
+        
         response_payload = json.loads(response['Payload'].read().decode("utf-8"))
+        logger.info(response_payload)
+        
         lambda_response = {}
         
         lambda_response['statusCode'] = 200
@@ -199,8 +209,8 @@ def execute_sql(sql_stm):
         
         return lambda_response
     except Exception as ve:
-        fail_reason = f"Encountered issue {ve}"
-        logger.error(fail_reason)
+        fail_reason = f"Encountered issue in execute sql:   {ve}"
+        logger.error(ve)
         return {
             "statusCode": 400,
             "Error":fail_reason
@@ -224,13 +234,8 @@ def make_defaults(json_obj):
          
     logger.info('2') 
     if 'smiles' not in json_obj or isnan(json_obj['smiles']):
-            logger.info(2.44)
             new_json['smiles'] = ''
-            logger.info(2.55)
             
-    
-         
-    logger.info('3')
     if 'format' not in json_obj or isnan(json_obj['format']):
         logger.info(3.33)
         new_json['format'] = 'pdbqt'
@@ -313,13 +318,21 @@ def make_defaults(json_obj):
     ## bytes
     if 'file_data' not in json_obj or isnan(json_obj['file_data']):
         new_json['file_data'] = ''
-    else:
-        new_json['file_data'] = json_obj['file_data']  
     
     return new_json                   
 
+### utils
 def isnan(x):
     return x != x
+
+
+def has_value(as_dict,key):
+    if key not in as_dict:
+        return False;
+    tmp = as_dict[key]
+    if isnan(tmp):
+        return False
+    return True
 
 
 class MolObject(object):

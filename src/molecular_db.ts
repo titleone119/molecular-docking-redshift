@@ -29,7 +29,7 @@ export class MolecularDb {
 
     let redshiftUsername = 'rsadmin';
     let redshiftDbName = 'dev';
-
+    
     let cluster = new redshift.Cluster(
       stack, 'rsCluster', {
         vpc: new ec2.Vpc(stack, 'vpc',
@@ -52,13 +52,17 @@ export class MolecularDb {
         vpcSubnets: { subnetType: ec2.SubnetType.ISOLATED },
       },
     );
-    let rs_task_helper = new SfnRedshiftTasker(
-      stack, 'RSTask', {
-        redshiftTargetProps: {
+    
+    
+    let props = {
           dbUser: redshiftUsername,
           dbName: redshiftDbName,
           clusterIdentifier: cluster.clusterName,
-        },
+    };
+        
+    let rs_task_helper = new SfnRedshiftTasker(
+      stack, 'RSTask', {
+        redshiftTargetProps: props,
         logLevel: 'DEBUG',
       },
     );
@@ -132,6 +136,37 @@ export class MolecularDb {
     });
     rs_task_helper.lambdaFunction.grantInvoke(mol_object_func);
   
+    
+    let allowRedshiftDataApiExecuteStatement = new iam.PolicyStatement({
+      actions: ['redshift-data:ExecuteStatement', 'redshift-data:DescribeStatement',
+        'redshift-data:GetStatementResult', 'redshift-data:CancelStatement', 'redshift-data:ListStatements'],
+      effect: iam.Effect.ALLOW,
+      resources: ['*'],
+    });
+
+    let allowRedshiftGetCredentials = new iam.PolicyStatement({
+      actions: ['redshift:GetClusterCredentials'],
+      effect: iam.Effect.ALLOW,
+      resources: [
+        cdk.Fn.sub(
+          'arn:${AWS::Partition}:redshift:${AWS::Region}:${AWS::AccountId}:dbname:${ID}/${DB}',
+          {
+            ID: props.redshiftTargetProps.clusterIdentifier,
+            DB: props.redshiftTargetProps.dbName,
+          },
+        ),
+        cdk.Fn.sub(
+          'arn:${AWS::Partition}:redshift:${AWS::Region}:${AWS::AccountId}:dbuser:${ID}/${DB_USER}',
+          {
+            ID: props.redshiftTargetProps.clusterIdentifier,
+            DB_USER: props.redshiftTargetProps.dbUser,
+          },
+        ),
+      ],
+    });
+
+    this.lambdaFunction.addToRolePolicy(allowRedshiftDataApiExecuteStatement);
+    this.lambdaFunction.addToRolePolicy(allowRedshiftGetCredentials);
     
     // Integrate the Lambda functions with the API Gateway resource
     const mol_objects = new LambdaIntegration(mol_object_func);

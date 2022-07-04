@@ -81,22 +81,30 @@ def handle_redshift_statement_invocation_event(event):
     logger.info(event)
     sql_statement = event[SQL_STATEMENT]
     action = event.get(ACTION)
+    
     if action == EXECUTE_SINGLETON_STATEMENT or action == EXECUTE_STATEMENT or action is None:
         run_as_singleton = action == EXECUTE_SINGLETON_STATEMENT
         callback_object = CallbackSourceBuilder.get_callback_object_for_event(event)
-        return handle_redshift_statement_invocation(sql_statement, callback_object, run_as_singleton)
+        
+        parameters = None
+        if "Parameters" in event:
+            parameters = event.get("Parameters")
+            
+        return handle_redshift_statement_invocation(sql_statement, callback_object, run_as_singleton, parameters)
     else:
         raise InvalidRequest(f"Unsupported {ACTION} to execute sql_statement {event}")
 
 
-def handle_redshift_statement_invocation(sql_statement: str, callback_object: CallbackInterface, run_as_singleton=False):
+def handle_redshift_statement_invocation(sql_statement: str, callback_object: CallbackInterface, run_as_singleton=False, parameters = None):
+    
+    
     if run_as_singleton and is_statement_in_active_state(sql_statement):
         raise ConcurrentExecution(f"There is already an instance of {sql_statement} running.")
     statement_name = ddb_sfn_state_table.register_execution_start(callback_object, sql_statement)
     with_event = not isinstance(callback_object, NoCallback)
     if not with_event:
         logger.debug(f'No callback for {sql_statement}')
-    response = execute_statement(sql_statement, str(statement_name), with_event=with_event)
+    response = execute_statement(sql_statement, str(statement_name), with_event=with_event, parameters=parameters)
     logger.info({
         l_response: response,
         l_callback_object: callback_object

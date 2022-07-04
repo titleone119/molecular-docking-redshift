@@ -8,8 +8,19 @@ import * as lambda from '@aws-cdk/aws-lambda';
 import { Code, Runtime } from '@aws-cdk/aws-lambda';
 import * as redshift from '@aws-cdk/aws-redshift';
 import * as cdk from '@aws-cdk/core';
+import * as iam from '@aws-cdk/aws-iam';
 import { CustomResource } from '@aws-cdk/core';
 import { SfnRedshiftTasker } from './index';
+import { RedshiftTargetProps} from './index'
+
+
+import { CancellingStatementMachine } from './machines/cancelling_statement';
+import { ChainedMachine } from './machines/chained_machines';
+import { ParallelNoConcurrencyMachine } from './machines/parallel_no_concurrency';
+import { PollingMachine } from './machines/polling';
+import { SingleSuccessMachine } from './machines/single_success';
+import { SuccessAndFailMachine } from './machines/success_and_fail';
+
 
 import { IResource, LambdaIntegration, MockIntegration, PassthroughBehavior, RestApi } from '@aws-cdk/aws-apigateway';
 
@@ -48,16 +59,16 @@ export class MolecularDb {
         },
         defaultDatabaseName: redshiftDbName,
         clusterType: redshift.ClusterType.SINGLE_NODE,
-        removalPolicy: cdk.RemovalPolicy.DESTROY,
+        removalPolicy: cdk.RemovalPolicy.RETAIN,
         vpcSubnets: { subnetType: ec2.SubnetType.ISOLATED },
       },
     );
     
     
     let props = {
-          dbUser: redshiftUsername,
-          dbName: redshiftDbName,
-          clusterIdentifier: cluster.clusterName,
+          "clusterIdentifier": cluster.clusterName,
+          "dbUser": redshiftUsername,
+          "dbName": redshiftDbName,
     };
         
     let rs_task_helper = new SfnRedshiftTasker(
@@ -78,8 +89,9 @@ export class MolecularDb {
     });
     rs_task_helper.lambdaFunction.grantInvoke(rs_create_drop);
 
-    // Create a table
-    //let rsTable = 
+    /**
+     * Create a molecular_data table
+    **/
     new CustomResource(stack, 'molecular_data_table', {
       serviceToken: rs_create_drop.functionArn,
       properties: {
@@ -116,57 +128,48 @@ export class MolecularDb {
         drop_sql: 'drop table if exists "public"."molecular_data";',
       },
     });
-
+  
+  /**
+     * Create exp_data_table for docking execution result
+    **/
+    new CustomResource(stack, 'exp_data_table', {
+      serviceToken: rs_create_drop.functionArn,
+      properties: {
+        create_sql: 'CREATE TABLE "public"."exp_data"(id BIGINT IDENTITY(1,1), ' +
+                     'executionId      character varying(256) encode lzo,' +
+                     'molId     BIGINT,' + 
+                     'score     numeric(18,0) encode az64,' + 
+                     'result_data  binary varying(500) encode lzo,' + 
+                     'CONSTRAINT exp_data_pkey PRIMARY KEY(id));',
+        drop_sql: 'drop table if exists "public"."exp_data";',
+      },
+    });
     
     //create lambda listening to mol json object and insert into table
     let insert_mol_json = new lambda.Function(stack, 'insert_mol_json', {
       runtime: Runtime.PYTHON_3_8,
       handler: 'insert-mol-json.handler',
       code: exampleFunctionsCode,
-      environment: { CDK_STEPFUNCTIONS_REDSHIFT_LAMBDA: rs_task_helper.lambdaFunction.functionName },
+      environment: { CDK_STEPFUNCTIONS_REDSHIFT_LAMBDA: rs_task_helper.lambdaFunction.functionName,
+                    ...props
+                    },
     });
     rs_task_helper.lambdaFunction.grantInvoke(insert_mol_json);
 
-    
+    /**
+     * Lambda Mol Object and API Gateway
+     * */
     let mol_object_func = new lambda.Function(stack, 'mol_object_function', {
       runtime: Runtime.PYTHON_3_8,
       handler: 'mol_object.handler',
       code: exampleFunctionsCode,
-      environment: { CDK_STEPFUNCTIONS_REDSHIFT_LAMBDA: rs_task_helper.lambdaFunction.functionName },
+      environment: { CDK_STEPFUNCTIONS_REDSHIFT_LAMBDA: rs_task_helper.lambdaFunction.functionName,
+                    ...props},
     });
     rs_task_helper.lambdaFunction.grantInvoke(mol_object_func);
-  
     
-    let allowRedshiftDataApiExecuteStatement = new iam.PolicyStatement({
-      actions: ['redshift-data:ExecuteStatement', 'redshift-data:DescribeStatement',
-        'redshift-data:GetStatementResult', 'redshift-data:CancelStatement', 'redshift-data:ListStatements'],
-      effect: iam.Effect.ALLOW,
-      resources: ['*'],
-    });
+    addFunctionRSPolicy(mol_object_func,props);
 
-    let allowRedshiftGetCredentials = new iam.PolicyStatement({
-      actions: ['redshift:GetClusterCredentials'],
-      effect: iam.Effect.ALLOW,
-      resources: [
-        cdk.Fn.sub(
-          'arn:${AWS::Partition}:redshift:${AWS::Region}:${AWS::AccountId}:dbname:${ID}/${DB}',
-          {
-            ID: props.redshiftTargetProps.clusterIdentifier,
-            DB: props.redshiftTargetProps.dbName,
-          },
-        ),
-        cdk.Fn.sub(
-          'arn:${AWS::Partition}:redshift:${AWS::Region}:${AWS::AccountId}:dbuser:${ID}/${DB_USER}',
-          {
-            ID: props.redshiftTargetProps.clusterIdentifier,
-            DB_USER: props.redshiftTargetProps.dbUser,
-          },
-        ),
-      ],
-    });
-
-    this.lambdaFunction.addToRolePolicy(allowRedshiftDataApiExecuteStatement);
-    this.lambdaFunction.addToRolePolicy(allowRedshiftGetCredentials);
     
     // Integrate the Lambda functions with the API Gateway resource
     const mol_objects = new LambdaIntegration(mol_object_func);
@@ -181,8 +184,68 @@ export class MolecularDb {
     items.addMethod('POST', mol_objects);
     addCorsOptions(items);
     
+    /**
+     * Docking Lambda
+     */
+    let docking_mol_func = new lambda.Function(stack, 'docking_mol_func', {
+      runtime: Runtime.PYTHON_3_8,
+      handler: 'docking_mol_list.handler',
+      code: exampleFunctionsCode,
+      environment: { CDK_STEPFUNCTIONS_REDSHIFT_LAMBDA: rs_task_helper.lambdaFunction.functionName },
+    });
+    rs_task_helper.lambdaFunction.grantInvoke(docking_mol_func);
+    
+    addFunctionRSPolicy(docking_mol_func,props);
+    
+    
+    /**
+     * workflow
+    */
+    let chainedMachine = new ChainedMachine(stack);
+    chainedMachine.push_front('singleSuccess', new SingleSuccessMachine(stack, rs_task_helper.lambdaFunction).definition);
+    chainedMachine.push_front('parallelNoConcurrency', new ParallelNoConcurrencyMachine(stack, rs_task_helper.lambdaFunction).definition);
+    chainedMachine.push_front('successAndFail', new SuccessAndFailMachine(stack, rs_task_helper.lambdaFunction).definition);
+    chainedMachine.push_front('polling', new PollingMachine(stack, rs_task_helper.lambdaFunction).definition);
+    chainedMachine.push_front('cancelling', new CancellingStatementMachine(stack, rs_task_helper.lambdaFunction).definition);
+    chainedMachine.build();
+    
+    
+    
     this.stack = [stack];
   }
+}
+
+export function addFunctionRSPolicy(lambdaFuc:lambda.Function, props:RedshiftTargetProps){
+      let allowRedshiftDataApiExecuteStatement = new iam.PolicyStatement({
+      actions: ['redshift-data:ExecuteStatement', 'redshift-data:DescribeStatement',
+        'redshift-data:GetStatementResult', 'redshift-data:CancelStatement', 'redshift-data:ListStatements'],
+      effect: iam.Effect.ALLOW,
+      resources: ['*'],
+    });
+
+    let allowRedshiftGetCredentials = new iam.PolicyStatement({
+      actions: ['redshift:GetClusterCredentials'],
+      effect: iam.Effect.ALLOW,
+      resources: [
+        cdk.Fn.sub(
+          'arn:${AWS::Partition}:redshift:${AWS::Region}:${AWS::AccountId}:dbname:${ID}/${DB}',
+          {
+            ID: props.clusterIdentifier,
+            DB: props.dbName,
+          },
+        ),
+        cdk.Fn.sub(
+          'arn:${AWS::Partition}:redshift:${AWS::Region}:${AWS::AccountId}:dbuser:${ID}/${DB_USER}',
+          {
+            ID: props.clusterIdentifier,
+            DB_USER: props.dbUser,
+          },
+        ),
+      ],
+    });
+
+    lambdaFuc.addToRolePolicy(allowRedshiftDataApiExecuteStatement);
+    lambdaFuc.addToRolePolicy(allowRedshiftGetCredentials);
 }
 
 export function addCorsOptions(apiResource: IResource) {

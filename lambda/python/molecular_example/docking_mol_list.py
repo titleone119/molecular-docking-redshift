@@ -174,27 +174,26 @@ def do_insert(records : list):
     return sql_statement
     
 
-def execute_sql(sql_stm, parameters = None):
+def execute_sql(sql_stm):
     try: 
         event = {}
         event[EVENT_SQL_STATEMENT] = sql_stm
         logger.info("execute_sql:" + sql_stm)
     
-        # response = lambda_client.invoke(
-        #     FunctionName=CDK_STEPFUNCTIONS_REDSHIFT_LAMBDA,
-        #     InvocationType='RequestResponse',
-        #     Payload=json.dumps(event).encode('utf-8')
-        # )
-        
-        response = redshift_data_api.execute_statement(
-            ClusterIdentifier='rscluster21ef444e-9kxvzceczqll',
-            Database='dev',
-            DbUser='rsadmin',
-            Sql=sql_stm,
-            StatementName='insert-mol',
-            parameters=parameters,
-            WithEvent=False  # When invoked from SFN with s task token we invoke using withEvent enabled.
+        response = lambda_client.invoke(
+            FunctionName=CDK_STEPFUNCTIONS_REDSHIFT_LAMBDA,
+            InvocationType='RequestResponse',
+            Payload=json.dumps(event).encode('utf-8')
         )
+        
+        # response = redshift_data_api.execute_statement(
+        #     ClusterIdentifier='rscluster21ef444e-9kxvzceczqll',
+        #     Database='dev',
+        #     DbUser='rsadmin',
+        #     Sql=sql_stm,
+        #     StatementName='insert-mol',
+        #     WithEvent=False  # When invoked from SFN with s task token we invoke using withEvent enabled.
+        # )
         
         # Must decode the payload
         logger.info("done exuecting....")

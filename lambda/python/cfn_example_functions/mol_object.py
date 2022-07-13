@@ -9,15 +9,11 @@ import math
 import os
 import boto3
 from logger import logger
-import cfnresponse
 
-
-CFN_RESOURCE_PROPERTIES = "ResourceProperties"
 CFN_REQUEST_TYPE = "RequestType"
 CFN_REQUEST_DELETE = "Delete"
 CFN_REQUEST_CREATE = "Create"
 CFN_REQUEST_UPDATE = "Update"
-CFN_REQUEST_TYPES = [CFN_REQUEST_CREATE, CFN_REQUEST_UPDATE, CFN_REQUEST_DELETE]
 
 EVENT_SQL_STATEMENT = "sqlStatement"
 CDK_STEPFUNCTIONS_REDSHIFT_LAMBDA = os.environ["CDK_STEPFUNCTIONS_REDSHIFT_LAMBDA"]
@@ -48,102 +44,40 @@ def handler(event, context):
     if not isinstance(event,dict):
         event = json.loads(event)
     
-    
     logger.info("event:" + json.dumps(event))
-    
-    #operations = ['insert','delete','unload','load']
-    
-    if not has_value(event,'operation'): 
-        return {
-            'statusCode': 400,
-            'body': 'No valid operation requested'
-        }
-    
-    operation = event['operation']
-    
-    if "Records" not in event :
-        return {
-            'statusCode': 400,
-            'body': json.dumps('Invalid Event type')
-        }
-    
-    records = event["Records"]
-    
-    print(json.dumps(records))
-    
-    ## check records data 
-    if type(records) is not list :
-        return {
-            'statusCode': 400,
-            'body': json.dumps('Records should be [] type')
-        }
-    
-    if len(records) == 0 :
-        return {
-            'statusCode': 200,
-            'body': json.dumps('nothing is done!')
-        }
     
     sql_stm = None
     
-    try:
-        if operation == 'insert':
-            sql_stm = do_insert(records)
-        elif operation == 'delete':
-            sql_stm = do_delete(records)
-        elif operation == 'unload':
-            sql_stm = do_unload(records)
-        elif operation == 'load':
-            sql_stm = do_load(records)
-        else:
-            logger.error('Invalid Operation. Nothing is done!')
+    if 'operation' in event and event['operation'] == 'insert':
+        
+        if "Records" not in event :
             return {
                 'statusCode': 400,
-                'body': 'Invalid Payload. Nothing is done!'
+                'body': json.dumps('Invalid Event type')
             }
         
-    except Exception as ve:
-        fail_reason = f"Encountered issue {ve}"
-        logger.error(fail_reason)
-        return {
-            "statusCode": 400,
-            "body":fail_reason
-        }
-    
+        records = event["Records"]
+        if len(records) == 0 :
+            return {
+                'statusCode': 200,
+                'body': json.dumps('nothing is done!')
+            }
+        sql_stm = do_insert(records)
+        
+    else:
+       if 'sql_statement' in event:
+           sql_stm = event['sql_statement']
+           
     if sql_stm is None:
         return {
             'statusCode': 400,
             'body': operation + ' is invalid. Nothing is done!'
         }
+        
     #Execute SQL Command on Redshift Server
     response = execute_sql(sql_stm)
     return response
-
-
-def do_delete(records : list):
     
-    stmt = 'delete from public.molecuar_data'
-    
-    if len(records) == 0:
-        return stmt;
-    stmt += 'where '
-    
-    index = 0
-    for record in records:
-        index += 1
-        if index != 1:
-            stmt += ' or '
-        
-        stmt += ' id = ' + record['id']
-        
-    return stmt
-    
-def do_load(records : list):
-    return None
-
-def do_unload(records : list):
-    
-    return None
     
 def do_insert(records : list):
     
@@ -176,8 +110,6 @@ def do_insert(records : list):
 
 def execute_sql(sql_stm, parameters = None):
     try: 
-        event = {}
-        event[EVENT_SQL_STATEMENT] = sql_stm
         logger.info("execute_sql:" + sql_stm)
     
         # response = lambda_client.invoke(
@@ -187,30 +119,29 @@ def execute_sql(sql_stm, parameters = None):
         # )
         
         response = redshift_data_api.execute_statement(
-            ClusterIdentifier='rscluster21ef444e-9kxvzceczqll',
-            Database='dev',
-            DbUser='rsadmin',
+            ClusterIdentifier= os.environ["clusterIdentifier"],
+            Database=os.environ["dbName"],
+            DbUser=os.environ["dbUser"],
             Sql=sql_stm,
             StatementName='insert-mol',
-            parameters=parameters,
+            # parameters=parameters,
             WithEvent=False  # When invoked from SFN with s task token we invoke using withEvent enabled.
         )
         
         # Must decode the payload
         logger.info("done exuecting....")
         
-        response_payload = json.loads(response['Payload'].read().decode("utf-8"))
-        logger.info(response_payload)
+        logger.info(response)
         
         lambda_response = {}
         
         lambda_response['statusCode'] = 200
-        lambda_response['body'] = json.dumps(response_payload)
+        lambda_response['body'] = json.dumps(response["ResponseMetadata"])
         logger.info(f"Lambda returned {(lambda_response)}")
         
         return lambda_response
     except Exception as ve:
-        fail_reason = f"Encountered issue in execute sql:   {ve}"
+        fail_reason = f"Encountered issue in executing sql:   {ve}"
         logger.error(ve)
         return {
             "statusCode": 400,

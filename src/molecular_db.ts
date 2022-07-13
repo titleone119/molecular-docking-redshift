@@ -5,6 +5,8 @@
 import * as path from 'path';
 import * as ec2 from '@aws-cdk/aws-ec2';
 import * as lambda from '@aws-cdk/aws-lambda';
+import *as sqs from '@aws-cdk/aws-sqs';
+
 import { Code, Runtime } from '@aws-cdk/aws-lambda';
 import * as redshift from '@aws-cdk/aws-redshift';
 import * as cdk from '@aws-cdk/core';
@@ -13,16 +15,9 @@ import { CustomResource } from '@aws-cdk/core';
 import { SfnRedshiftTasker } from './index';
 import { RedshiftTargetProps} from './index'
 
-
-import { CancellingStatementMachine } from './machines/cancelling_statement';
-import { ChainedMachine } from './machines/chained_machines';
-import { ParallelNoConcurrencyMachine } from './machines/parallel_no_concurrency';
-import { PollingMachine } from './machines/polling';
-import { SingleSuccessMachine } from './machines/single_success';
-import { SuccessAndFailMachine } from './machines/success_and_fail';
-
-
 import { IResource, LambdaIntegration, MockIntegration, PassthroughBehavior, RestApi } from '@aws-cdk/aws-apigateway';
+import { SqsToLambda } from '@aws-solutions-constructs/aws-sqs-lambda';
+import { MolDockingMainWorkflow } from './machines/mol_dock_main';
 
 
 export class MolecularDb {
@@ -129,7 +124,7 @@ export class MolecularDb {
       },
     });
   
-  /**
+    /**
      * Create exp_data_table for docking execution result
     **/
     new CustomResource(stack, 'exp_data_table', {
@@ -145,16 +140,16 @@ export class MolecularDb {
       },
     });
     
-    //create lambda listening to mol json object and insert into table
-    let insert_mol_json = new lambda.Function(stack, 'insert_mol_json', {
-      runtime: Runtime.PYTHON_3_8,
-      handler: 'insert-mol-json.handler',
-      code: exampleFunctionsCode,
-      environment: { CDK_STEPFUNCTIONS_REDSHIFT_LAMBDA: rs_task_helper.lambdaFunction.functionName,
-                    ...props
-                    },
-    });
-    rs_task_helper.lambdaFunction.grantInvoke(insert_mol_json);
+    // //create lambda listening to mol json object and insert into table
+    // let insert_mol_json = new lambda.Function(stack, 'insert_mol_json', {
+    //   runtime: Runtime.PYTHON_3_8,
+    //   handler: 'insert-mol-json.handler',
+    //   code: exampleFunctionsCode,
+    //   environment: { CDK_STEPFUNCTIONS_REDSHIFT_LAMBDA: rs_task_helper.lambdaFunction.functionName,
+    //                 ...props
+    //                 },
+    // });
+    // rs_task_helper.lambdaFunction.grantInvoke(insert_mol_json);
 
     /**
      * Lambda Mol Object and API Gateway
@@ -184,32 +179,39 @@ export class MolecularDb {
     items.addMethod('POST', mol_objects);
     addCorsOptions(items);
     
+    
+    let dockingFunctionCode = Code.fromAsset(path.join(__dirname, '../lambda/python/sample_docking'));
     /**
-     * Docking Lambda
+     * Mol Docking Lambda
      */
     let docking_mol_func = new lambda.Function(stack, 'docking_mol_func', {
       runtime: Runtime.PYTHON_3_8,
-      handler: 'docking_mol_list.handler',
-      code: exampleFunctionsCode,
-      environment: { CDK_STEPFUNCTIONS_REDSHIFT_LAMBDA: rs_task_helper.lambdaFunction.functionName },
+      handler: 'docking_lambda.handler',
+      code: dockingFunctionCode,
+      environment: { CDK_STEPFUNCTIONS_REDSHIFT_LAMBDA: rs_task_helper.lambdaFunction.functionName , ...props},
     });
-    rs_task_helper.lambdaFunction.grantInvoke(docking_mol_func);
-    
     addFunctionRSPolicy(docking_mol_func,props);
     
     
     /**
-     * workflow
+     * SQS for docking task data 
+     */
+    const data_queue = new sqs.Queue(stack, 'MolecularDataQueue');
+    //let data_queue_arm = data_queue.queueArn;
+    
+    /**
+     * Source SQS to docking Lambda  
+     */
+    new SqsToLambda(stack, 'SqsToCompleter', {
+        existingLambdaObj: docking_mol_func,
+        existingQueueObj: data_queue,
+      });
+      
+      
+    /**
+     * workflow to emit mol data to SQS
     */
-    let chainedMachine = new ChainedMachine(stack);
-    chainedMachine.push_front('singleSuccess', new SingleSuccessMachine(stack, rs_task_helper.lambdaFunction).definition);
-    chainedMachine.push_front('parallelNoConcurrency', new ParallelNoConcurrencyMachine(stack, rs_task_helper.lambdaFunction).definition);
-    chainedMachine.push_front('successAndFail', new SuccessAndFailMachine(stack, rs_task_helper.lambdaFunction).definition);
-    chainedMachine.push_front('polling', new PollingMachine(stack, rs_task_helper.lambdaFunction).definition);
-    chainedMachine.push_front('cancelling', new CancellingStatementMachine(stack, rs_task_helper.lambdaFunction).definition);
-    chainedMachine.build();
-    
-    
+   new MolDockingMainWorkflow(stack,rs_task_helper.lambdaFunction,data_queue)
     
     this.stack = [stack];
   }

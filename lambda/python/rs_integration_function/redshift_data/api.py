@@ -49,7 +49,7 @@ def get_statement_id_for_statement_name(statement_name: str) -> str:
     return statements[0]["Id"]
 
 
-def execute_statement(sql_statement: str, statement_name: str, with_event: bool, parameters = None) -> dict:
+def execute_statement(sql_statement: str, statement_name: str, with_event: bool, params = None) -> dict:
     '''
         Parameters=[
             {
@@ -59,7 +59,7 @@ def execute_statement(sql_statement: str, statement_name: str, with_event: bool,
         ],
     '''
     
-    if parameters is None:
+    if params is None:
         return redshift_data_api.execute_statement(
             ClusterIdentifier=os.environ[CLUSTER_IDENTIFIER],
             Database=os.environ[DATABASE],
@@ -69,6 +69,13 @@ def execute_statement(sql_statement: str, statement_name: str, with_event: bool,
             WithEvent=with_event  # When invoked from SFN with s task token we invoke using withEvent enabled.
         )
     else:
+        
+        for pair_dict in params:
+            name = pair_dict['name']
+            value = pair_dict['value']
+            sql_statement = sql_statement.replace(':' + name, "'" + value + "'")
+            
+        logger.info("updated sql: " + sql_statement)
         
         return redshift_data_api.execute_statement(
             ClusterIdentifier=os.environ[CLUSTER_IDENTIFIER],

@@ -3,6 +3,7 @@
 
 
 import traceback
+import json
 from aws_lambda_powertools.utilities.batch import sqs_batch_processor
 
 from callback_sources.builder import CallbackSourceBuilder
@@ -75,6 +76,13 @@ def _handler(event: dict, context):
     else:
         raise InvalidRequest(f"Unsupported invocation event {event}.")
 
+def make_statement_invocation_parameters(event):
+    
+    params = None
+    if 'parameters' in event:
+        params = event['parameters']
+    return params
+    
 
 def handle_redshift_statement_invocation_event(event):
     assert SQL_STATEMENT in event, f"Programming error should never handle invocation without SQL_STATEMENT {event}."
@@ -86,16 +94,14 @@ def handle_redshift_statement_invocation_event(event):
         run_as_singleton = action == EXECUTE_SINGLETON_STATEMENT
         callback_object = CallbackSourceBuilder.get_callback_object_for_event(event)
         
-        parameters = None
-        if "Parameters" in event:
-            parameters = event.get("Parameters")
-            
-        return handle_redshift_statement_invocation(sql_statement, callback_object, run_as_singleton, parameters)
+        paras = make_statement_invocation_parameters(event)
+        
+        return handle_redshift_statement_invocation(sql_statement, callback_object, run_as_singleton, paras)
     else:
         raise InvalidRequest(f"Unsupported {ACTION} to execute sql_statement {event}")
 
 
-def handle_redshift_statement_invocation(sql_statement: str, callback_object: CallbackInterface, run_as_singleton=False, parameters = None):
+def handle_redshift_statement_invocation(sql_statement: str, callback_object: CallbackInterface, run_as_singleton=False, params = None):
     
     
     if run_as_singleton and is_statement_in_active_state(sql_statement):
@@ -104,7 +110,7 @@ def handle_redshift_statement_invocation(sql_statement: str, callback_object: Ca
     with_event = not isinstance(callback_object, NoCallback)
     if not with_event:
         logger.debug(f'No callback for {sql_statement}')
-    response = execute_statement(sql_statement, str(statement_name), with_event=with_event, parameters=parameters)
+    response = execute_statement(sql_statement, str(statement_name), with_event=with_event, params=params)
     logger.info({
         l_response: response,
         l_callback_object: callback_object

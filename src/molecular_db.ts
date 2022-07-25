@@ -7,17 +7,21 @@ import * as ec2 from '@aws-cdk/aws-ec2';
 import * as lambda from '@aws-cdk/aws-lambda';
 import *as sqs from '@aws-cdk/aws-sqs';
 
+import { LambdaToSqs } from "@aws-solutions-constructs/aws-lambda-sqs";
+
 import { Code, Runtime } from '@aws-cdk/aws-lambda';
 import * as redshift from '@aws-cdk/aws-redshift';
+// import * as dynamodb from '@aws-cdk/aws-dynamodb';
 import * as cdk from '@aws-cdk/core';
 import * as iam from '@aws-cdk/aws-iam';
-import { CustomResource } from '@aws-cdk/core';
+import { CustomResource, Duration } from '@aws-cdk/core';
 import { SfnRedshiftTasker } from './index';
 import { RedshiftTargetProps} from './index'
 
 import { IResource, LambdaIntegration, MockIntegration, PassthroughBehavior, RestApi } from '@aws-cdk/aws-apigateway';
 import { SqsToLambda } from '@aws-solutions-constructs/aws-sqs-lambda';
 import { MolDockingMainWorkflow } from './machines/mol_dock_main';
+// import { LambdaToDynamoDB } from '@aws-solutions-constructs/aws-lambda-dynamodb';
 
 
 export class MolecularDb {
@@ -64,6 +68,8 @@ export class MolecularDb {
           "clusterIdentifier": cluster.clusterName,
           "dbUser": redshiftUsername,
           "dbName": redshiftDbName,
+          "endpoint_hostname": cluster.clusterEndpoint.hostname,
+          "endpoint_port": cluster.clusterEndpoint.port + ""
     };
         
     let rs_task_helper = new SfnRedshiftTasker(
@@ -131,8 +137,9 @@ export class MolecularDb {
       serviceToken: rs_create_drop.functionArn,
       properties: {
         create_sql: 'CREATE TABLE "public"."exp_data"(id BIGINT IDENTITY(1,1), ' +
-                     'executionId      character varying(256) encode lzo,' +
                      'molId     BIGINT,' + 
+                     'executionId      character varying(256) encode lzo,' +
+                     'create_time     timestamp,' +
                      'score     numeric(18,0) encode az64,' + 
                      'result_data  binary varying(500) encode lzo,' + 
                      'CONSTRAINT exp_data_pkey PRIMARY KEY(id));',
@@ -180,6 +187,49 @@ export class MolecularDb {
     addCorsOptions(items);
     
     
+    /**
+     * SQS for docking Result data 
+     */
+    const docking_result_queue = new sqs.Queue(stack, 'docking_result_queue',{
+            maxMessageSizeBytes:256000,
+            retentionPeriod:Duration.days(1),
+            visibilityTimeout:Duration.minutes(15),
+    });
+    
+    let resultDockingFunctionCode = Code.fromAsset(path.join(__dirname, '../lambda/python/molecule_object'));
+    /**
+     * Docking Result Lambda
+     */
+    let docking_result_func = new lambda.Function(stack, 'docking_result_func', {
+      runtime: Runtime.PYTHON_3_8,
+      handler: 'docking_result.handler',
+      code: resultDockingFunctionCode,
+      environment: {...props},
+    });
+    
+    
+    /**
+     * Source SQS to docking Result Lambda  
+     */
+    new SqsToLambda(stack, 'SQS_docking_result_queue', {
+        existingLambdaObj: docking_result_func,
+        existingQueueObj: docking_result_queue,
+        sqsEventSourceProps:{
+          batchSize: 20, // default
+          maxBatchingWindow: Duration.minutes(5)
+        }
+      });
+      
+    
+    /**
+     * SQS for docking task data 
+     */
+    const data_queue = new sqs.Queue(stack, 'MolecularDataQueue',{
+            maxMessageSizeBytes:1000,
+            retentionPeriod:Duration.days(5),
+            visibilityTimeout:Duration.minutes(15),
+    });
+    
     let dockingFunctionCode = Code.fromAsset(path.join(__dirname, '../lambda/python/sample_docking'));
     /**
      * Mol Docking Lambda
@@ -188,16 +238,16 @@ export class MolecularDb {
       runtime: Runtime.PYTHON_3_8,
       handler: 'docking_lambda.handler',
       code: dockingFunctionCode,
-      environment: { CDK_STEPFUNCTIONS_REDSHIFT_LAMBDA: rs_task_helper.lambdaFunction.functionName , ...props},
+      environment: { "docking_result_queue": docking_result_queue.queueUrl, ...props},
     });
+    
+    new LambdaToSqs(this, 'LambdaToSqsForDockingResult', {
+        existingLambdaObj: docking_mol_func,
+        existingQueueObj: docking_result_queue,
+    });
+    
     addFunctionRSPolicy(docking_mol_func,props);
     
-    
-    /**
-     * SQS for docking task data 
-     */
-    const data_queue = new sqs.Queue(stack, 'MolecularDataQueue');
-    //let data_queue_arm = data_queue.queueArn;
     
     /**
      * Source SQS to docking Lambda  
@@ -205,9 +255,14 @@ export class MolecularDb {
     new SqsToLambda(stack, 'SqsToCompleter', {
         existingLambdaObj: docking_mol_func,
         existingQueueObj: data_queue,
+        sqsEventSourceProps:{
+          batchSize: 1, // default
+          maxBatchingWindow: Duration.minutes(1)
+        }
       });
-      
-      
+    
+    
+
     /**
      * workflow to emit mol data to SQS
     */

@@ -48,6 +48,10 @@ export class MolParallelPush {
                           maxConcurrency: 40,
                           itemsPath: sfn.JsonPath.stringAt('$.Records'),
                           resultPath: sfn.JsonPath.DISCARD,
+                          parameters:{
+                                "molId.$": "$$.Map.Item.Value[0]['longValue']",
+                                "executionId.$": "$.executionId"
+                          }
     });
      
     // //let queryDataProcedure = createQueryingDataProcedure(scope)

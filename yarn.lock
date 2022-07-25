@@ -8188,8 +8188,7 @@
   "version" "2.2.0"
 
 "xmldom@github:xmldom/xmldom#0.7.0":
-  "integrity" "sha512-f8QX0xc7jyCs45MIDz4KxK9LpgtE8+OKNM6J0WEI8vdVk2NKdeVbApcIEs6xH15nrgdaOoP0e1XcjB55zT1NwQ=="
-  "resolved" "https://codeload.github.com/xmldom/xmldom/tar.gz/c568938641cc1f121cef5b4df80fcfda1e489b6e"
+  "resolved" "git+ssh://git@github.com/xmldom/xmldom.git#c568938641cc1f121cef5b4df80fcfda1e489b6e"
   "version" "0.7.0"
 
 "xtend@~4.0.1":

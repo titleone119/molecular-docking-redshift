@@ -12,10 +12,8 @@ from logger import logger
 
 s3 = boto3.resource('s3')
 
-redshift_data_api = boto3.client('redshift-data')
-
 SELECT_DATA_SQL = 'SELECT id, file_data::varchar FROM public.molecular_data where id='
-INSERT_RESULT_SQL = "INSERT into exp_data(molid,score,result_data) VALUES ("
+INSERT_RESULT_SQL = "INSERT into exp_data(molid,executionid,score,result_data) VALUES "
 
 LIGAND_FILE_NAME = 'ligand.pdbqt'
 OUT_FILE_NAME = 'vina_out.pdbqt'
@@ -23,6 +21,8 @@ OUT_FILE_NAME = 'vina_out.pdbqt'
 RECERVER_FILE_NAME = '4EK3_rec.pdbqt'
 
 projectPath = os.getenv("LAMBDA_TASK_ROOT")
+# Create SQS client
+sqs = boto3.client('sqs')
 
 global conn
 
@@ -32,15 +32,17 @@ def handler(event, context):
     
     for record in event['Records']:
         try:
-            logger.info(json.dumps(record))
+            #logger.info(json.dumps(record))
             
             msg = json.loads(record['body'])
-            msg = msg[0]
+            # msg = msg[0]
             
-            mol_id = msg['longValue']
-            logger.info("mol id : " + str(mol_id))
+            mol_id = msg["molId"]
+            execution_id = msg["executionId"]
             
-            query_data_and_dock(mol_id)
+            logger.info("mol id : " + str(mol_id) + ", execution_id" + execution_id)
+            
+            query_data_and_dock(mol_id,execution_id)
             
             
         except Exception as e:
@@ -63,15 +65,17 @@ def init():
                 
     subprocess.check_output(command, shell=True, stderr=subprocess.STDOUT)
     
+    global queue_url
+    queue_url = os.environ['docking_result_queue']
+
+def query_data_and_dock(mol_id,execution_id) :
+    
     
     conn_string = "dbname='dev' port='5439' user='rsadmin' password='ABCDefg1234!!' host='10.0.0.41'"
     global conn
     conn = psycopg2.connect(conn_string)
     conn.autocommit = True
     #r = os.system('chmod +x ' + projectPath + '/vina')
-    
-
-def query_data_and_dock(mol_id) :
     
     # conn_string = "dbname='dev' port='5439' user='rsadmin' password='ABCDefg1234!!' host='10.0.0.41'"
     # conn = psycopg2.connect(conn_string)
@@ -80,67 +84,88 @@ def query_data_and_dock(mol_id) :
     #for record in cursor:
     record = cursor.fetchone()
     
-    if record is not None:
-        
-        logger.info(record)
-        file_data = record[1]
-        
-        file_data = binascii.unhexlify(file_data)
-        file_data = binascii.unhexlify(file_data)
-        
-        #logger.info('unhexlify: ' + file_data)
-        file_data = zlib.decompress(file_data)
-        file_data = file_data.decode('utf-8')
-        
-        file_data = file_data.replace("'"," ")
-        logger.info('decompress: ' + str(file_data))
-        
-        ligand_file = open("/tmp/ligand.pdbqt", "w")
-        ligand_file.write(file_data)
-        ligand_file.close()
-        
-        #start to dock
-        dock_mol(mol_id)
-    
     cursor.close()
+    conn.close()
     
-def dock_mol(mol_id):
     
-    # vina = [ "/tmp/vina","--config" ,  "/tmp/test.conf","--receptor",\
-    #         "/tmp/4EK3_rec.pdbqt" ,"--ligand", "/tmp/ligand.pdbqt", \
-    #         "--out", "/tmp/vina_out.pdbqt"]
+    if record is not None:
+        try:
+            #logger.info(record)
+            file_data = record[1]
+            
+            file_data = binascii.unhexlify(file_data)
+            file_data = binascii.unhexlify(file_data)
+            
+            #logger.info('unhexlify: ' + file_data)
+            file_data = zlib.decompress(file_data)
+            file_data = file_data.decode('utf-8')
+            
+            file_data = file_data.replace("'"," ")
+            #logger.info('decompress: ' + str(file_data))
+            
+            ligand_file = open("/tmp/ligand.pdbqt", "w")
+            ligand_file.write(file_data)
+            
+            ligand_file.close()
+            
+            #start to dock
+            dock_mol(mol_id,execution_id)
+        except Exception as ve:
+            fail_reason = f"Encountered issue in docking:   {ve}"
+            logger.error(ve)
+            msg = {
+                "molId":mol_id,
+                "executionId": execution_id,
+                "score": 0,
+                "data": ""
+            }
+            report_result(msg)
+    
+    
+def dock_mol(mol_id,execution_id):
+    
     vina = [ "/tmp/vina","--config",  projectPath + "/test.conf","--receptor",\
             projectPath + "/4EK3_rec.pdbqt", "--ligand", "/tmp/ligand.pdbqt", \
             "--out", "/tmp/vina_out.pdbqt"]
-    subprocess.check_call(vina)
-    
+    subprocess.call(vina,timeout=800)
     # vina = "/tmp/vina --config /tmp/test.conf --receptor /tmp/4EK3_rec.pdbqt --ligand /tmp/1iep_ligand.pdbqt --out /tmp/vina_out.pdbqt"
     # output = subprocess.check_output(vina, shell=True)
     # logger.info(output)
     
-    report_result(mol_id)
-    
-
-def report_result(mol_id):
-    
     #open text file in read mode
     text_file = open("/tmp/vina_out.pdbqt", "r")
     #read whole file to a string
-    data = text_file.read()
+    lines = text_file.readlines()
     
-    logger.info("" + data)
     #close file
     text_file.close()
- 
     
-    sql_stm = INSERT_RESULT_SQL + str(mol_id) + ",NULL,'" + data + "')";
+    line = lines[1] #2nd line
+    score = float(line.split(':')[1].split()[0])
     
-    global conn
-    cursor = conn.cursor()
-    result = cursor.execute(sql_stm);
+    out_data = "\n".join(lines)# Concatenate all lines
     
-    cursor.close()
+    #close file
+    text_file.close()
     
+    msg = {
+        "molId":mol_id,
+        "executionId": execution_id,
+        "score": score,
+        "data":out_data
+    }
+    report_result(msg)
+
+def report_result(msg):
+    
+    msg_str = json.dumps(msg)
+    global queue_url
+    sqs.send_message(
+        QueueUrl=queue_url,
+        MessageAttributes={},
+        MessageBody=msg_str
+    )
+    logger.info('sent msg: '  +  msg_str[0:100] )
         
 def clean_tmp_file():
     

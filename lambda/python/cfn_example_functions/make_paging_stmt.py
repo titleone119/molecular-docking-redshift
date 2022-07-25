@@ -47,19 +47,20 @@ def handler(event, context):
 
     idSqlStatement += ' order by id limit ' + str(pageSize) + ' offset ' + str(int(totalCount))
     
-    executionId = ''
+    executionId = None
+    
     docking_result_sql = None
-    if not has_value(event, 'docking_result_sql'):
+    if (not has_value(event, 'docking_result_sql')) or (not has_value(event,'executionId')):
         if has_value(event,'executionId'):
-            executionId = event[executionId]
-        else:
+            executionId = event['executionId']
+        else:    
             now = datetime.now()
             executionId = 'EXP-' + now.strftime("%Y%m%d-%H%M%S")
         docking_result_sql = "select count(*) from exp_data where executionid='" + executionId + "'"
     else:
+        executionId = event['executionId']
         docking_result_sql = event['docking_result_sql']
-    
-    
+        
     logger.info('docking_result_sql:' + docking_result_sql)
     
     response = {}
